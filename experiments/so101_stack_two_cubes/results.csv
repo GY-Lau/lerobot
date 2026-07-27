@@ -1,0 +1,2 @@
+run_id,date,policy,checkpoint_steps,train_episodes,train_frames,eval_horizon_s,placement_regime,trials,successes,success_rate,amp,power_mode,comparable,notes
+act_30k_exploratory_30s,2026-07-23,act,30000,30,17970,30,unspecified,10,2,0.2,false,25W,false,"Exploratory run; 30 s horizon and unstandardized placements"
