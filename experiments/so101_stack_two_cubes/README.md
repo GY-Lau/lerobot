@@ -50,3 +50,7 @@ placement protocol was not yet standardized.
   confidence intervals, and failure counts.
 - [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation
   with automatic dataset resume.
+- [`workspace_grid_a3.svg`](workspace_grid_a3.svg): printable 20 mm physical
+  coordinate grid with a 100 mm scale check.
+- [`generate_trial_plan.py`](generate_trial_plan.py): deterministic, shared
+  30-trial placement schedule.

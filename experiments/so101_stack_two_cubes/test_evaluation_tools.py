@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from generate_trial_plan import generate_plan, validate_cells
 from log_trial import FIELDNAMES, append_trial, next_trial_index, read_rows, validate_outcome
 from summarize_trials import summarize, wilson_interval
 
@@ -60,6 +61,27 @@ class EvaluationToolsTest(unittest.TestCase):
         low, high = wilson_interval(2, 10)
         self.assertAlmostEqual(low, 0.0567, places=3)
         self.assertAlmostEqual(high, 0.5098, places=3)
+
+    def test_trial_plan_is_deterministic_and_balanced(self) -> None:
+        kwargs = {
+            "fixed_yellow": "G8",
+            "fixed_red": "M6",
+            "yellow_cells": ["F7", "G7", "F8", "G8"],
+            "red_cells": ["L5", "M5", "L6", "M6"],
+            "yaw_values": [0.0, 45.0, 90.0],
+            "seed": 123,
+        }
+        first = generate_plan(**kwargs)
+        second = generate_plan(**kwargs)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 30)
+        self.assertEqual(sum(row["placement_regime"] == "fixed" for row in first), 10)
+        self.assertEqual(sum(row["placement_regime"] == "bounded_random" for row in first), 10)
+        self.assertEqual(sum(row["placement_regime"] == "position_orientation_random" for row in first), 10)
+
+    def test_trial_plan_rejects_overlapping_regions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must be disjoint"):
+            validate_cells("G8", "G8", ["G8"], ["G8"])
 
 
 if __name__ == "__main__":

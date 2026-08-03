@@ -84,6 +84,28 @@ set of marked angles.
 The exact region dimensions, grid cells, minimum separation, and yaw values
 must be filled in after measuring the physical workspace.
 
+Print [`workspace_grid_a3.svg`](workspace_grid_a3.svg) in A3 landscape mode at
+100% / actual size. Verify the printed calibration bar is exactly 100 mm, place
+the edge marked `ARM BASE SIDE` toward the robot base, and do not move the mat
+between policies.
+
+After choosing reachable, disjoint yellow and red regions, generate the shared
+30-trial schedule. The following cells are only an example and must be replaced
+with cells verified on the real setup:
+
+```bash
+python experiments/so101_stack_two_cubes/generate_trial_plan.py \
+  --fixed-yellow G8 \
+  --fixed-red M6 \
+  --yellow-cells F7 G7 F8 G8 \
+  --red-cells L5 M5 L6 M6 \
+  --yaw-values 0 45 90 135 \
+  --seed 20260803
+```
+
+The first 10 trials are fixed, the next 10 randomize position, and the last 10
+randomize position and yaw. Reuse the generated CSV unchanged for every policy.
+
 ## Failure taxonomy
 
 Assign exactly one primary failure label to every failed trial:
