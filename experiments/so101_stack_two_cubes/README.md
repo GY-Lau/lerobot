@@ -48,3 +48,5 @@ placement protocol was not yet standardized.
   trial at a time.
 - [`summarize_trials.py`](summarize_trials.py): success rates, Wilson 95%
   confidence intervals, and failure counts.
+- [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation
+  with automatic dataset resume.

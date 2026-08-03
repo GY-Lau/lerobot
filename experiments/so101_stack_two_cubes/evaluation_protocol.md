@@ -37,6 +37,18 @@ The checker connects only to the motor bus, reads positions, sends no action,
 and preserves the existing torque state. A trial is comparable only if the
 checker reports `overall: PASS` before recording starts.
 
+For ACT, the recommended runner combines this pose gate with exactly one
+20-second episode:
+
+```bash
+bash experiments/so101_stack_two_cubes/run_act_trial.sh \
+  act_30k_fixed_20s 030000 false
+```
+
+Run the same command again after physically resetting the arm and cubes. The
+runner detects the existing local dataset and appends one episode. Using one
+episode per invocation avoids an uncontrolled reset phase between trials.
+
 ## Success definition
 
 A trial succeeds when all conditions hold:
