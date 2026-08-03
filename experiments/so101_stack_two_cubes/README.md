@@ -42,3 +42,7 @@ placement protocol was not yet standardized.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the
   follower's initial joint pose.
+- [`log_trial.py`](log_trial.py): validated, append-only entry of one physical
+  trial at a time.
+- [`summarize_trials.py`](summarize_trials.py): success rates, Wilson 95%
+  confidence intervals, and failure counts.

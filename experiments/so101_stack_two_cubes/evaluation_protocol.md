@@ -92,3 +92,28 @@ Assign exactly one primary failure label to every failed trial:
 Report success count, trial count, success rate, and failure counts. Also report
 median and P95 episode control-loop latency when latency instrumentation is
 available.
+
+After each trial, append one row. A successful example is:
+
+```bash
+python experiments/so101_stack_two_cubes/log_trial.py \
+  --run-id act_30k_fixed_20s \
+  --placement-regime fixed \
+  --yellow-position Y0 \
+  --red-position R0 \
+  --success \
+  --completion-time-s 14.2
+```
+
+For a failure, replace `--success` with one taxonomy label, for example:
+
+```bash
+--failure-label grasp_failure
+```
+
+The trial index is assigned automatically within each run. Summarize all runs
+with a Wilson 95% confidence interval using:
+
+```bash
+python experiments/so101_stack_two_cubes/summarize_trials.py
+```
