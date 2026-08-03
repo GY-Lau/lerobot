@@ -38,6 +38,8 @@ placement protocol was not yet standardized.
 
 - [`evaluation_protocol.md`](evaluation_protocol.md): success definition,
   placement regimes, and failure taxonomy.
+- [`data_audit.md`](data_audit.md): structural, start-pose, and visual audit of
+  the original 30 demonstrations.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the
