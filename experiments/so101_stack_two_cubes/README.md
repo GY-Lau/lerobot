@@ -50,6 +50,10 @@ placement protocol was not yet standardized.
   confidence intervals, and failure counts.
 - [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation
   with automatic dataset resume.
+- [`diffusion_policy.md`](diffusion_policy.md): matched-comparison design and
+  verified Jetson compatibility measurements.
+- [`train_diffusion.sh`](train_diffusion.sh): guarded, reproducible Diffusion
+  Policy training command.
 - [`workspace_grid_a3.svg`](workspace_grid_a3.svg): printable 20 mm physical
   coordinate grid with a 100 mm scale check.
 - [`generate_trial_plan.py`](generate_trial_plan.py): deterministic, shared
