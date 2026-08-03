@@ -12,6 +12,30 @@ the setup between policies.
 - Run at least 30 trials for a reportable result.
 - Record every trial, including failures.
 
+## Reference arm pose
+
+The reference pose is the per-joint median of frame zero from all 30 original
+demonstrations. Body joints are expressed in degrees; the gripper uses its
+normalized 0-100 range.
+
+| Joint | Target | Tolerance |
+| --- | ---: | ---: |
+| shoulder_pan | -6.15 | +/- 2.50 |
+| shoulder_lift | -103.25 | +/- 2.50 |
+| elbow_flex | 97.23 | +/- 0.50 |
+| wrist_flex | 53.23 | +/- 4.00 |
+| wrist_roll | 1.01 | +/- 8.00 |
+| gripper | 2.25 | +/- 1.00 |
+
+Before a reportable trial, check the follower with:
+
+```bash
+python experiments/so101_stack_two_cubes/check_start_pose.py
+```
+
+The checker reads positions and sends no action. A trial is comparable only if
+the checker reports `overall: PASS` before recording starts.
+
 ## Success definition
 
 A trial succeeds when all conditions hold:
@@ -67,4 +91,3 @@ Assign exactly one primary failure label to every failed trial:
 Report success count, trial count, success rate, and failure counts. Also report
 median and P95 episode control-loop latency when latency instrumentation is
 available.
-

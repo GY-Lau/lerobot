@@ -40,3 +40,5 @@ placement protocol was not yet standardized.
   placement regimes, and failure taxonomy.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
+- [`check_start_pose.py`](check_start_pose.py): read-only validation of the
+  follower's initial joint pose.
