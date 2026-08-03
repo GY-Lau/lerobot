@@ -63,48 +63,47 @@ seconds have elapsed, the trial is a failure.
 
 ## Placement regimes
 
-Mark the workspace so placements can be reproduced.
+Keep the original, unmarked tabletop visible during every evaluation. Do not
+add a printed grid or calibration pattern that was absent from the training
+demonstrations: changing the background would introduce a visual domain shift.
+
+Cube positions are measured after the fact from each episode's first camera
+frame. Pixel centers are stored as normalized camera coordinates `u=x/width`
+and `v=y/height`, so the placement distribution remains auditable without
+putting guides in the policy's field of view. Before starting a run, save one
+reference frame and do not move the camera, robot base, or surrounding objects.
 
 ### Fixed
 
-Use one marked center and orientation for each cube. This tests whether the
-policy can reproduce the demonstrated behavior under minimal variation.
+Reset both cubes by eye to the reference-frame positions. The detected start
+coordinates, rather than a visible table marker, determine how closely the
+placement matches the reference. This tests behavior under minimal variation.
 
 ### Bounded random
 
-Sample each cube center from a marked rectangular region. Record the sampled
-position or grid cell. Keep the two regions and minimum cube separation fixed
-for every policy.
+Randomize both cube centers within the central 10th-to-90th percentile ranges
+measured from the 30 training episode starts. Keep the cubes separated and
+fully visible. This is the in-distribution generalization condition.
 
 ### Position and orientation random
 
-Use the same regions as bounded random and also sample cube yaw from a fixed
-set of marked angles.
+Use locations near the edges of the demonstrated position ranges and vary cube
+yaw by eye. This is a harder held-out-layout condition while retaining the
+same natural background.
 
-The exact region dimensions, grid cells, minimum separation, and yaw values
-must be filled in after measuring the physical workspace.
-
-Print [`workspace_grid_a3.svg`](workspace_grid_a3.svg) in A3 landscape mode at
-100% / actual size. Verify the printed calibration bar is exactly 100 mm, place
-the edge marked `ARM BASE SIDE` toward the robot base, and do not move the mat
-between policies.
-
-After choosing reachable, disjoint yellow and red regions, generate the shared
-30-trial schedule. The following cells are only an example and must be replaced
-with cells verified on the real setup:
+Run the color-based placement audit with:
 
 ```bash
-python experiments/so101_stack_two_cubes/generate_trial_plan.py \
-  --fixed-yellow G8 \
-  --fixed-red M6 \
-  --yellow-cells F7 G7 F8 G8 \
-  --red-cells L5 M5 L6 M6 \
-  --yaw-values 0 45 90 135 \
-  --seed 20260803
+python experiments/so101_stack_two_cubes/analyze_cube_placements.py \
+  --dataset-root ~/.cache/huggingface/lerobot/GY-William/lerobot_stack_two_cubes \
+  --output experiments/so101_stack_two_cubes/training_start_positions.csv
 ```
 
-The first 10 trials are fixed, the next 10 randomize position, and the last 10
-randomize position and yaw. Reuse the generated CSV unchanged for every policy.
+The first 10 trials use the reference layout, the next 10 sample
+in-distribution positions, and the last 10 use held-out edge layouts. Preserve
+the generated schedule and reuse it unchanged for every policy. The placement
+detector is an evaluation instrument only; its output is never given to the
+policy.
 
 ## Failure taxonomy
 
@@ -150,4 +149,14 @@ with a Wilson 95% confidence interval using:
 
 ```bash
 python experiments/so101_stack_two_cubes/summarize_trials.py
+```
+
+The ACT runner also appends per-frame measurements to
+`outputs/eval_latency/<run-id>.csv`. The first 30 frames of each episode are
+marked as warm-up and excluded by default. Summarize total command latency and
+separate expensive action-chunk refreshes from cached-action frames with:
+
+```bash
+python experiments/so101_stack_two_cubes/summarize_latency.py \
+  outputs/eval_latency/act_30k_fixed_20s.csv
 ```

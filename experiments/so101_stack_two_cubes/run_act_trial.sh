@@ -51,6 +51,7 @@ record_bin="$(dirname -- "$python_bin")/lerobot-record"
 model="$repo_root/outputs/train/act_stack_two_cubes_30k/checkpoints/$checkpoint/pretrained_model"
 dataset_base="${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}"
 dataset_root="$dataset_base/GY-William/$run_id"
+latency_log="$repo_root/outputs/eval_latency/$run_id.csv"
 
 export PYTHONNOUSERSITE=1
 
@@ -74,6 +75,8 @@ record_cmd=(
   --dataset.fps=30
   --dataset.push_to_hub=false
   --display_data=false
+  "--latency_log_path=$latency_log"
+  --latency_warmup_frames=30
 )
 
 if [[ -f "$dataset_root/meta/info.json" ]]; then
@@ -101,4 +104,3 @@ echo
 echo "Starting one ACT evaluation trial: $run_id ($checkpoint, AMP=$use_amp)"
 echo "Keep hands clear and be ready to stop the robot."
 "${record_cmd[@]}"
-

@@ -67,12 +67,15 @@ lerobot-record \
 ```
 """
 
+import csv
 import logging
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from pprint import pformat
 from typing import Any
+
+import torch
 
 from lerobot.cameras import (  # noqa: F401
     CameraConfig,  # noqa: F401
@@ -226,6 +229,10 @@ class RecordConfig:
     play_sounds: bool = True
     # Resume recording on an existing dataset.
     resume: bool = False
+    # Optional CSV path for per-frame control-loop latency measurements.
+    latency_log_path: str | Path | None = None
+    # Frames at the start of each episode to mark as warm-up in the latency CSV.
+    latency_warmup_frames: int = 30
 
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
@@ -239,6 +246,10 @@ class RecordConfig:
 
         if self.teleop is None and self.policy is None:
             raise ValueError("Choose a policy, a teleoperator or both to control the robot")
+        if self.latency_log_path is not None and self.policy is None:
+            raise ValueError("Latency profiling currently requires a policy")
+        if self.latency_warmup_frames < 0:
+            raise ValueError("latency_warmup_frames must be non-negative")
 
     @classmethod
     def __get_path_fields__(cls) -> list[str]:
@@ -276,6 +287,59 @@ class RecordConfig:
 """
 
 
+LATENCY_FIELDS = (
+    "episode_index",
+    "frame_index",
+    "warmup",
+    "policy_refresh",
+    "observation_ms",
+    "observation_processing_ms",
+    "frame_build_ms",
+    "policy_ms",
+    "action_processing_ms",
+    "send_action_ms",
+    "dataset_write_ms",
+    "display_ms",
+    "command_latency_ms",
+    "work_ms",
+    "loop_period_ms",
+)
+
+
+def _policy_will_refresh_action_chunk(policy: PreTrainedPolicy) -> bool:
+    """Return whether the next select_action call must run model inference."""
+    action_queue = getattr(policy, "_action_queue", None)
+    if action_queue is not None:
+        return len(action_queue) == 0
+
+    queues = getattr(policy, "_queues", None)
+    if isinstance(queues, dict) and ACTION in queues:
+        return len(queues[ACTION]) == 0
+
+    # Unknown policy implementations are conservatively classified as refreshes.
+    return True
+
+
+def _synchronize_policy_device(policy: PreTrainedPolicy) -> None:
+    device = get_safe_torch_device(policy.config.device)
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def _append_latency_rows(path: str | Path, rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+
+    output_path = Path(path).expanduser()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not output_path.exists() or output_path.stat().st_size == 0
+    with output_path.open("a", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=LATENCY_FIELDS)
+        if write_header:
+            writer.writeheader()
+        writer.writerows(rows)
+
+
 @safe_stop_image_writer
 def record_loop(
     robot: Robot,
@@ -299,6 +363,9 @@ def record_loop(
     single_task: str | None = None,
     display_data: bool = False,
     display_compressed_images: bool = False,
+    latency_log_path: str | Path | None = None,
+    latency_warmup_frames: int = 30,
+    episode_index: int = 0,
 ):
     if dataset is not None and dataset.fps != fps:
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset.fps} != {fps}).")
@@ -335,26 +402,45 @@ def record_loop(
         postprocessor.reset()
 
     no_action_count = 0
+    frame_index = 0
+    latency_rows: list[dict[str, Any]] = []
     timestamp = 0
     start_episode_t = time.perf_counter()
     while timestamp < control_time_s:
         start_loop_t = time.perf_counter()
+        row: dict[str, Any] = {
+            "episode_index": episode_index,
+            "frame_index": frame_index,
+            "warmup": frame_index < latency_warmup_frames,
+            "policy_refresh": False,
+        }
 
         if events["exit_early"]:
             events["exit_early"] = False
             break
 
         # Get robot observation
+        phase_t = time.perf_counter()
         obs = robot.get_observation()
+        row["observation_ms"] = (time.perf_counter() - phase_t) * 1000
 
         # Applies a pipeline to the raw robot observation, default is IdentityProcessor
+        phase_t = time.perf_counter()
         obs_processed = robot_observation_processor(obs)
+        row["observation_processing_ms"] = (time.perf_counter() - phase_t) * 1000
 
+        phase_t = time.perf_counter()
         if policy is not None or dataset is not None:
             observation_frame = build_dataset_frame(dataset.features, obs_processed, prefix=OBS_STR)
+        row["frame_build_ms"] = (time.perf_counter() - phase_t) * 1000
 
         # Get action from either policy or teleop
+        phase_t = time.perf_counter()
         if policy is not None and preprocessor is not None and postprocessor is not None:
+            if latency_log_path is not None:
+                row["policy_refresh"] = _policy_will_refresh_action_chunk(policy)
+                _synchronize_policy_device(policy)
+                phase_t = time.perf_counter()
             action_values = predict_action(
                 observation=observation_frame,
                 policy=policy,
@@ -365,6 +451,8 @@ def record_loop(
                 task=single_task,
                 robot_type=robot.robot_type,
             )
+            if latency_log_path is not None:
+                _synchronize_policy_device(policy)
 
             act_processed_policy: RobotAction = make_robot_action(action_values, dataset.features)
 
@@ -390,33 +478,45 @@ def record_loop(
                     "The robot won't be at its rest position at the start of the next episode."
                 )
             continue
+        row["policy_ms"] = (time.perf_counter() - phase_t) * 1000
 
         # Applies a pipeline to the action, default is IdentityProcessor
+        phase_t = time.perf_counter()
         if policy is not None and act_processed_policy is not None:
             action_values = act_processed_policy
             robot_action_to_send = robot_action_processor((act_processed_policy, obs))
         else:
             action_values = act_processed_teleop
             robot_action_to_send = robot_action_processor((act_processed_teleop, obs))
+        row["action_processing_ms"] = (time.perf_counter() - phase_t) * 1000
 
         # Send action to robot
         # Action can eventually be clipped using `max_relative_target`,
         # so action actually sent is saved in the dataset. action = postprocessor.process(action)
         # TODO(steven, pepijn, adil): we should use a pipeline step to clip the action, so the sent action is the action that we input to the robot.
+        phase_t = time.perf_counter()
         _sent_action = robot.send_action(robot_action_to_send)
+        send_end_t = time.perf_counter()
+        row["send_action_ms"] = (send_end_t - phase_t) * 1000
+        row["command_latency_ms"] = (send_end_t - start_loop_t) * 1000
 
         # Write to dataset
+        phase_t = time.perf_counter()
         if dataset is not None:
             action_frame = build_dataset_frame(dataset.features, action_values, prefix=ACTION)
             frame = {**observation_frame, **action_frame, "task": single_task}
             dataset.add_frame(frame)
+        row["dataset_write_ms"] = (time.perf_counter() - phase_t) * 1000
 
+        phase_t = time.perf_counter()
         if display_data:
             log_rerun_data(
                 observation=obs_processed, action=action_values, compress_images=display_compressed_images
             )
+        row["display_ms"] = (time.perf_counter() - phase_t) * 1000
 
         dt_s = time.perf_counter() - start_loop_t
+        row["work_ms"] = dt_s * 1000
 
         sleep_time_s: float = 1 / fps - dt_s
         if sleep_time_s < 0:
@@ -425,8 +525,15 @@ def record_loop(
             )
 
         precise_sleep(max(sleep_time_s, 0.0))
+        row["loop_period_ms"] = (time.perf_counter() - start_loop_t) * 1000
+        if latency_log_path is not None:
+            latency_rows.append(row)
+        frame_index += 1
 
         timestamp = time.perf_counter() - start_episode_t
+
+    if latency_log_path is not None:
+        _append_latency_rows(latency_log_path, latency_rows)
 
 
 @parser.wrap()
@@ -547,6 +654,9 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
                     single_task=cfg.dataset.single_task,
                     display_data=cfg.display_data,
                     display_compressed_images=display_compressed_images,
+                    latency_log_path=cfg.latency_log_path,
+                    latency_warmup_frames=cfg.latency_warmup_frames,
+                    episode_index=dataset.num_episodes,
                 )
 
                 # Execute a few seconds without recording to give time to manually reset the environment

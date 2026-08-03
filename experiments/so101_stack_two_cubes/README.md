@@ -48,13 +48,15 @@ placement protocol was not yet standardized.
   trial at a time.
 - [`summarize_trials.py`](summarize_trials.py): success rates, Wilson 95%
   confidence intervals, and failure counts.
+- [`summarize_latency.py`](summarize_latency.py): mean/P50/P95 control latency,
+  deadline misses, and action-chunk refresh versus cached-action timing.
 - [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation
   with automatic dataset resume.
+- [`analyze_cube_placements.py`](analyze_cube_placements.py): marker-free red
+  and yellow cube localization in normalized camera coordinates.
 - [`diffusion_policy.md`](diffusion_policy.md): matched-comparison design and
   verified Jetson compatibility measurements.
 - [`train_diffusion.sh`](train_diffusion.sh): guarded, reproducible Diffusion
   Policy training command.
-- [`workspace_grid_a3.svg`](workspace_grid_a3.svg): printable 20 mm physical
-  coordinate grid with a 100 mm scale check.
-- [`generate_trial_plan.py`](generate_trial_plan.py): deterministic, shared
-  30-trial placement schedule.
+- [`generate_trial_plan.py`](generate_trial_plan.py): deterministic placement
+  schedule generator retained for setups that use physical coordinates.
