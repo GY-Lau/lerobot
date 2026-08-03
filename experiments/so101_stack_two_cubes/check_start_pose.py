@@ -66,12 +66,17 @@ def main() -> int:
     )
     robot = SO101Follower(config)
 
+    # Connect only the motor bus. SO101Follower.connect() also configures the
+    # motors and toggles torque, which is unnecessary for a read-only check.
+    # The calibration loaded by SO101Follower.__init__ is still applied by the
+    # bus when decoding Present_Position.
     try:
-        robot.connect(calibrate=False)
+        robot.bus.connect()
         observation = robot.get_observation()
     finally:
-        if robot.is_connected:
-            robot.disconnect()
+        if robot.bus.is_connected:
+            # Preserve the torque state: this checker must not alter it.
+            robot.bus.disconnect(disable_torque=False)
 
     passed, rows = check_pose(observation)
     print(f"{'joint':<22} {'target':>9} {'actual':>9} {'error':>9} {'tol':>7}  status")
@@ -85,4 +90,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

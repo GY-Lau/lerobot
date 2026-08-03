@@ -33,8 +33,9 @@ Before a reportable trial, check the follower with:
 python experiments/so101_stack_two_cubes/check_start_pose.py
 ```
 
-The checker reads positions and sends no action. A trial is comparable only if
-the checker reports `overall: PASS` before recording starts.
+The checker connects only to the motor bus, reads positions, sends no action,
+and preserves the existing torque state. A trial is comparable only if the
+checker reports `overall: PASS` before recording starts.
 
 ## Success definition
 
