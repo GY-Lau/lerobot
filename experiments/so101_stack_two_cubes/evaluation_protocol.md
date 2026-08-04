@@ -42,7 +42,7 @@ For ACT, the recommended runner combines this pose gate with exactly one
 
 ```bash
 bash experiments/so101_stack_two_cubes/run_act_trial.sh \
-  act_30k_fixed_20s 030000 false
+  eval_act_30k_fixed_20s 030000 false
 ```
 
 Run the same command again after physically resetting the arm and cubes. The
@@ -130,7 +130,7 @@ After each trial, append one row. A successful example is:
 
 ```bash
 python experiments/so101_stack_two_cubes/log_trial.py \
-  --run-id act_30k_fixed_20s \
+  --run-id eval_act_30k_fixed_20s \
   --placement-regime fixed \
   --yellow-position Y0 \
   --red-position R0 \
@@ -158,5 +158,5 @@ separate expensive action-chunk refreshes from cached-action frames with:
 
 ```bash
 python experiments/so101_stack_two_cubes/summarize_latency.py \
-  outputs/eval_latency/act_30k_fixed_20s.csv
+  outputs/eval_latency/eval_act_30k_fixed_20s.csv
 ```

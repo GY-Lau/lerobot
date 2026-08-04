@@ -8,8 +8,8 @@ Usage:
   run_act_trial.sh [--dry-run] RUN_ID [CHECKPOINT] [USE_AMP]
 
 Examples:
-  run_act_trial.sh act_30k_fixed_20s 030000 false
-  run_act_trial.sh act_60k_fixed_20s 060000 true
+  run_act_trial.sh eval_act_30k_fixed_20s 030000 false
+  run_act_trial.sh eval_act_60k_fixed_20s 060000 true
 
 Each invocation records exactly one 20-second episode. Reusing RUN_ID appends
 one episode to the same local evaluation dataset.
@@ -33,6 +33,10 @@ use_amp="${3:-false}"
 
 if [[ ! "$run_id" =~ ^[a-zA-Z0-9._-]+$ ]]; then
   echo "RUN_ID may contain only letters, numbers, dot, underscore, and hyphen." >&2
+  exit 2
+fi
+if [[ "$run_id" != eval_* ]]; then
+  echo "RUN_ID must begin with 'eval_' when recording with a policy." >&2
   exit 2
 fi
 if [[ ! "$checkpoint" =~ ^[0-9]{6}$ ]]; then
