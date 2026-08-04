@@ -40,6 +40,16 @@ placement protocol was not yet standardized.
   placement regimes, and failure taxonomy.
 - [`data_audit.md`](data_audit.md): structural, start-pose, and visual audit of
   the original 30 demonstrations.
+- [`act_data_efficiency.md`](act_data_efficiency.md): controlled 10/20/30
+  episode ACT ablation and matched-budget interpretation rules.
+- [`training_start_positions.csv`](training_start_positions.csv): per-episode
+  marker-free cube detections used to construct the ACT subsets.
+- [`act_data_subsets.json`](act_data_subsets.json): deterministic nested episode
+  membership with source-data hash and quality balance.
+- [`generate_act_subsets.py`](generate_act_subsets.py): reproducible spatial
+  coverage and quality-stratified subset generator.
+- [`train_act_data_efficiency.sh`](train_act_data_efficiency.sh): guarded ACT
+  10/20/30 episode training launcher matched to the 30-episode baseline.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the

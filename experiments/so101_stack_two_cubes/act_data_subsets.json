@@ -1,0 +1,95 @@
+{
+  "dataset_repo_id": "GY-William/lerobot_stack_two_cubes",
+  "source_positions_csv": "training_start_positions.csv",
+  "source_positions_sha256": "244867130e3ccf11bba6ffb05a05d5461a365e024757059eee1b3f9d247c86e5",
+  "algorithm": "quality-stratified nested farthest-point traversal v1",
+  "feature_keys": [
+    "red_u",
+    "red_v",
+    "yellow_u",
+    "yellow_v"
+  ],
+  "total_episodes": 30,
+  "total_clean_episodes": 19,
+  "total_flagged_episodes": 11,
+  "subsets": {
+    "10": {
+      "episodes": [
+        0,
+        2,
+        15,
+        17,
+        19,
+        22,
+        24,
+        26,
+        27,
+        28
+      ],
+      "clean_episodes": 6,
+      "flagged_episodes": 4
+    },
+    "20": {
+      "episodes": [
+        0,
+        2,
+        4,
+        5,
+        7,
+        11,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        22,
+        23,
+        24,
+        26,
+        27,
+        28,
+        29
+      ],
+      "clean_episodes": 13,
+      "flagged_episodes": 7
+    },
+    "30": {
+      "episodes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "clean_episodes": 19,
+      "flagged_episodes": 11
+    }
+  }
+}
