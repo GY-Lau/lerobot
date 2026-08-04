@@ -39,8 +39,9 @@ Notable start-state outliers include:
 - Episode 15: wrist-roll value of -12.44.
 
 The median pose is therefore used as the evaluation reference instead of the
-mean. The central 80% range informs the tolerances in
-`check_start_pose.py`.
+mean. The central 80% range informs the optional strict profile in
+`check_start_pose.py`; the default relaxed profile covers the complete observed
+start-pose range for generalization evaluation.
 
 ## Visual start-frame audit
 
@@ -78,4 +79,3 @@ exploratory 2/10 result mixes model error with inconsistent initial conditions.
 4. Use predefined cube grid cells and yaw values.
 5. Start recording only after both hands leave the image.
 6. Preserve every failed evaluation and assign a failure taxonomy label.
-

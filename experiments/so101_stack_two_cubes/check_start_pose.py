@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
-"""Check an SO-101 follower against the experiment's reference start pose.
+"""Check an SO-101 follower against the experiment's start-pose envelope.
 
 The reference is the per-joint median of frame zero from the 30 demonstration
-episodes in ``GY-William/lerobot_stack_two_cubes``. This utility reads joint
-positions and never sends an action command.
+episodes in ``GY-William/lerobot_stack_two_cubes``. The default relaxed profile
+covers the complete demonstrated start-pose range; the strict profile covers
+approximately its central 80%. This utility reads joint positions and never
+sends an action command.
 """
 
 from __future__ import annotations
@@ -23,26 +25,41 @@ REFERENCE = {
     "gripper.pos": 2.25,
 }
 
-# Rounded bounds covering approximately the central 80% of demonstration
-# start poses. Body joints are in degrees; the gripper uses its normalized
-# 0-100 range.
-TOLERANCE = {
-    "shoulder_pan.pos": 2.5,
-    "shoulder_lift.pos": 2.5,
-    "elbow_flex.pos": 0.5,
-    "wrist_flex.pos": 4.0,
-    "wrist_roll.pos": 8.0,
-    "gripper.pos": 1.0,
+# Body joints are in degrees; the gripper uses its normalized 0-100 range.
+TOLERANCE_PROFILES = {
+    # Rounded symmetric tolerances covering approximately the central 80% of
+    # the 30 demonstration start poses.
+    "strict": {
+        "shoulder_pan.pos": 2.5,
+        "shoulder_lift.pos": 2.5,
+        "elbow_flex.pos": 0.5,
+        "wrist_flex.pos": 4.0,
+        "wrist_roll.pos": 8.0,
+        "gripper.pos": 1.0,
+    },
+    # Rounded symmetric tolerances covering the complete observed start-pose
+    # range. This is the default evaluation gate: it avoids demanding one
+    # exact arm pose while still rejecting starts outside the training support.
+    "relaxed": {
+        "shoulder_pan.pos": 5.0,
+        "shoulder_lift.pos": 5.0,
+        "elbow_flex.pos": 4.25,
+        "wrist_flex.pos": 16.0,
+        "wrist_roll.pos": 13.5,
+        "gripper.pos": 18.0,
+    },
 }
 
 
-def check_pose(observation: dict[str, float]) -> tuple[bool, list[tuple]]:
+def check_pose(
+    observation: dict[str, float], tolerances: dict[str, float]
+) -> tuple[bool, list[tuple]]:
     rows = []
     passed = True
     for joint, target in REFERENCE.items():
         actual = float(observation[joint])
         error = actual - target
-        tolerance = TOLERANCE[joint]
+        tolerance = tolerances[joint]
         joint_passed = abs(error) <= tolerance
         passed &= joint_passed
         rows.append((joint, target, actual, error, tolerance, joint_passed))
@@ -53,6 +70,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default="/dev/ttyACM0")
     parser.add_argument("--robot-id", default="lerobot_follower_arm")
+    parser.add_argument(
+        "--profile",
+        choices=tuple(TOLERANCE_PROFILES),
+        default="relaxed",
+        help="relaxed covers all demonstrated starts; strict covers the central 80%%",
+    )
     return parser.parse_args()
 
 
@@ -78,7 +101,8 @@ def main() -> int:
             # Preserve the torque state: this checker must not alter it.
             robot.bus.disconnect(disable_torque=False)
 
-    passed, rows = check_pose(observation)
+    passed, rows = check_pose(observation, TOLERANCE_PROFILES[args.profile])
+    print(f"profile: {args.profile}")
     print(f"{'joint':<22} {'target':>9} {'actual':>9} {'error':>9} {'tol':>7}  status")
     for joint, target, actual, error, tolerance, joint_passed in rows:
         status = "PASS" if joint_passed else "FAIL"

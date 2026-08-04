@@ -88,7 +88,8 @@ if [[ -f "$dataset_root/meta/info.json" ]]; then
 fi
 
 if "$dry_run"; then
-  printf 'pose check:\n  %q %q\n\nrecord command:\n  ' "$python_bin" "$script_dir/check_start_pose.py"
+  printf 'pose check:\n  %q %q %q %q\n\nrecord command:\n  ' \
+    "$python_bin" "$script_dir/check_start_pose.py" --profile relaxed
   printf '%q ' "${record_cmd[@]}"
   printf '\n'
   exit 0
@@ -102,7 +103,7 @@ for required_path in "$python_bin" "$record_bin" "$model/model.safetensors" /dev
 done
 
 echo "Checking the follower start pose..."
-"$python_bin" "$script_dir/check_start_pose.py"
+"$python_bin" "$script_dir/check_start_pose.py" --profile relaxed
 
 echo
 echo "Starting one ACT evaluation trial: $run_id ($checkpoint, AMP=$use_amp)"

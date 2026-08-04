@@ -18,19 +18,28 @@ The reference pose is the per-joint median of frame zero from all 30 original
 demonstrations. Body joints are expressed in degrees; the gripper uses its
 normalized 0-100 range.
 
-| Joint | Target | Tolerance |
-| --- | ---: | ---: |
-| shoulder_pan | -6.15 | +/- 2.50 |
-| shoulder_lift | -103.25 | +/- 2.50 |
-| elbow_flex | 97.23 | +/- 0.50 |
-| wrist_flex | 53.23 | +/- 4.00 |
-| wrist_roll | 1.01 | +/- 8.00 |
-| gripper | 2.25 | +/- 1.00 |
+| Joint | Target | Strict tolerance | Relaxed tolerance |
+| --- | ---: | ---: | ---: |
+| shoulder_pan | -6.15 | +/- 2.50 | +/- 5.00 |
+| shoulder_lift | -103.25 | +/- 2.50 | +/- 5.00 |
+| elbow_flex | 97.23 | +/- 0.50 | +/- 4.25 |
+| wrist_flex | 53.23 | +/- 4.00 | +/- 16.00 |
+| wrist_roll | 1.01 | +/- 8.00 | +/- 13.50 |
+| gripper | 2.25 | +/- 1.00 | +/- 18.00 |
+
+The default `relaxed` profile covers the complete start-pose range observed in
+the 30 demonstrations. It is the gate for generalization evaluation: starts do
+not need to reproduce one exact pose, but must remain inside the training
+support. Use `--profile strict` only for tightly controlled reproduction.
+
+For a fair policy comparison, ACT and Diffusion must receive the same paired
+start poses (or the same declared pose distribution); every trial does not need
+to use the single median pose.
 
 Before a reportable trial, check the follower with:
 
 ```bash
-python experiments/so101_stack_two_cubes/check_start_pose.py
+python experiments/so101_stack_two_cubes/check_start_pose.py --profile relaxed
 ```
 
 The checker connects only to the motor bus, reads positions, sends no action,
