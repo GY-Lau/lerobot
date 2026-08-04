@@ -62,16 +62,22 @@ counts disagree with the parquet data.
 
 ## 3. Run a resource smoke test before the long job
 
-Install the optional dependencies once in the active LeRobot environment:
+The Jetson's configured Aliyun mirror did not expose `num2words`, so install
+the two missing packages from the official PyPI index:
 
 ```bash
 cd ~/lerobot
-python -m pip install -e ".[smolvla,peft]"
+python -m pip install --index-url https://pypi.org/simple \
+  num2words==0.5.14 peft==0.20.0
 ```
 
-The Jetson environment was checked on 2026-08-05: CUDA, BF16, Accelerate, and
-PyArrow were available, while `peft` and `num2words` were not yet installed.
-The training launcher checks these dependencies before loading the model.
+The Jetson environment was checked on 2026-08-05. The installation added only
+`docopt`, `num2words`, and `peft`; its dry-run confirmed that Torch and the CUDA
+stack would not be replaced. Imports with `PYTHONNOUSERSITE=1`, CUDA BF16
+support, and construction of SmolVLA's rank-16 `LoraConfig` all passed. Exact
+versions are captured in
+[`jetson_smolvla_environment.txt`](jetson_smolvla_environment.txt). The
+training launcher checks these dependencies before loading the model.
 
 SmolVLA PEFT reduces trainable parameters but does not remove the base model's
 activation memory. First verify model download, one forward/backward pass,

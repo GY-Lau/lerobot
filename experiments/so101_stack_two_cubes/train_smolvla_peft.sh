@@ -114,8 +114,8 @@ for required_path in "$python_bin" "$train_bin" "$accelerate_bin" "$dataset_root
   fi
 done
 if ! "$python_bin" -c 'import num2words, peft' >/dev/null 2>&1; then
-  echo 'Missing SmolVLA/PEFT dependencies. Install them from the repository with:' >&2
-  echo '  python -m pip install -e ".[smolvla,peft]"' >&2
+  echo 'Missing SmolVLA/PEFT dependencies. Install the validated versions with:' >&2
+  echo '  python -m pip install --index-url https://pypi.org/simple num2words==0.5.14 peft==0.20.0' >&2
   exit 1
 fi
 if ! "$python_bin" -c 'import torch; raise SystemExit(0 if torch.cuda.is_bf16_supported() else 1)' \

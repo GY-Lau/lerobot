@@ -1,0 +1,17 @@
+validated_at=2026-08-05
+architecture=aarch64
+kernel=5.15.185-tegra
+jetpack=6.2.2+b24
+l4t=36.5.0-20260115194252
+python=3.10.20
+lerobot=0.4.5
+torch=2.10.0
+torchvision=0.25.0
+transformers=5.3.0
+accelerate=1.14.0
+peft=0.20.0
+num2words=0.5.14
+pyarrow=25.0.0
+cuda_available=true
+bf16_supported=true
+smolvla_peft_config_build=pass

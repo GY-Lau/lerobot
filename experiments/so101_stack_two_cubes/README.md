@@ -70,5 +70,7 @@ placement protocol was not yet standardized.
   task vocabulary, per-task episode balance, and label integrity.
 - [`train_smolvla_peft.sh`](train_smolvla_peft.sh): guarded SmolVLA LoRA smoke
   test and full-training launcher.
+- [`jetson_smolvla_environment.txt`](jetson_smolvla_environment.txt): validated
+  JetPack, Python, CUDA/BF16, and PEFT package versions.
 - [`generate_trial_plan.py`](generate_trial_plan.py): deterministic placement
   schedule generator retained for setups that use physical coordinates.
