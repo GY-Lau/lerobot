@@ -55,7 +55,9 @@ placement protocol was not yet standardized.
 - [`analyze_cube_placements.py`](analyze_cube_placements.py): marker-free red
   and yellow cube localization in normalized camera coordinates.
 - [`diffusion_policy.md`](diffusion_policy.md): matched-comparison design and
-  verified Jetson compatibility measurements.
+  verified Jetson training and closed-loop inference measurements.
+- [`jetson_diffusion_latency.csv`](jetson_diffusion_latency.csv): auditable
+  n2/n5/n10/n100 Diffusion latency comparison with raw-log hashes.
 - [`train_diffusion.sh`](train_diffusion.sh): guarded, reproducible Diffusion
   Policy training command.
 - [`generate_trial_plan.py`](generate_trial_plan.py): deterministic placement
