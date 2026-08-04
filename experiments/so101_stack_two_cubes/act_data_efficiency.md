@@ -71,6 +71,20 @@ bash experiments/so101_stack_two_cubes/train_act_data_efficiency.sh \
 Reuse `act_stack_two_cubes_30k/checkpoints/030000` as the 30-episode point; do
 not retrain it under a different configuration and silently combine results.
 
+Before evaluating a completed subset run, verify both artifact completeness and
+the training contract:
+
+```bash
+python experiments/so101_stack_two_cubes/verify_act_checkpoint.py \
+  outputs/train/act_stack_two_cubes_10ep_30k/checkpoints/030000 \
+  --episode-count=10
+```
+
+The verifier checks the final training step, exact episode membership, dataset,
+batch size, seed, policy type, AMP setting, optimizer learning rate, scheduler,
+and required model/processor files. A directory merely existing is not evidence
+that the run completed.
+
 ## Evaluation and reporting
 
 Evaluate all three checkpoints on the exact same paired physical trial

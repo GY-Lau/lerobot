@@ -50,6 +50,8 @@ placement protocol was not yet standardized.
   coverage and quality-stratified subset generator.
 - [`train_act_data_efficiency.sh`](train_act_data_efficiency.sh): guarded ACT
   10/20/30 episode training launcher matched to the 30-episode baseline.
+- [`verify_act_checkpoint.py`](verify_act_checkpoint.py): validates final files,
+  training step, subset membership, and the matched ACT training contract.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the
