@@ -60,5 +60,15 @@ placement protocol was not yet standardized.
   n2/n5/n10/n100 Diffusion latency comparison with raw-log hashes.
 - [`train_diffusion.sh`](train_diffusion.sh): guarded, reproducible Diffusion
   Policy training command.
+- [`smolvla_peft.md`](smolvla_peft.md): evidence-gated two-task language-control
+  design, PEFT training protocol, and text-before-voice evaluation matrix.
+- [`record_inverse_language_data.sh`](record_inverse_language_data.sh):
+  one-episode recorder for the red-on-yellow inverse behavior.
+- [`prepare_language_dataset.sh`](prepare_language_dataset.sh): guarded merge
+  of the two color orders into one balanced multi-task dataset.
+- [`validate_language_dataset.py`](validate_language_dataset.py): verifies
+  task vocabulary, per-task episode balance, and label integrity.
+- [`train_smolvla_peft.sh`](train_smolvla_peft.sh): guarded SmolVLA LoRA smoke
+  test and full-training launcher.
 - [`generate_trial_plan.py`](generate_trial_plan.py): deterministic placement
   schedule generator retained for setups that use physical coordinates.
