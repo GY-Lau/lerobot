@@ -91,6 +91,10 @@ placement protocol was not yet standardized.
 - [`record_inverse_language_data.sh`](record_inverse_language_data.sh):
   progress-aware one-episode recorder for the red-on-yellow inverse behavior;
   it stops at the declared 30-episode target.
+- [`record_act_v2_data.sh`](record_act_v2_data.sh): progress-aware recorder for
+  the independent 50-episode, higher-quality yellow-on-red ACT v2 dataset.
+- [`discard_last_act_v2_episode.sh`](discard_last_act_v2_episode.sh): guarded
+  removal of a failed final v2 demonstration with the original data retained.
 - [`prepare_language_dataset.sh`](prepare_language_dataset.sh): guarded merge
   of the two color orders into one balanced multi-task dataset.
 - [`validate_language_dataset.py`](validate_language_dataset.py): verifies

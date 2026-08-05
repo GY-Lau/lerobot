@@ -180,6 +180,7 @@ hashes before the publication status is changed from `local_only`.
 | Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
 | ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
+| ACT v2 demonstrations | Independent 50-episode clean-collection protocol with progress limit and backed-up rejection of the last attempt | Recorder ready; collection pending |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
@@ -193,8 +194,8 @@ Claims not yet supported:
 
 ## Next evidence gates
 
-1. If a statistically reportable data-efficiency ranking is needed, expand the
-   completed five-trial screen to the paired 30-trial schedule.
+1. Record 50 independent, clean ACT v2 demonstrations and compare nested v2
+   30/50-episode checkpoints against the retained v1 baseline.
 2. Decide whether the Diffusion comparison uses non-Jetson inference or a
    separately disclosed asynchronous/smaller deployment experiment.
 3. Record and audit 30 red-on-yellow demonstrations.
