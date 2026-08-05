@@ -1,2 +1,5 @@
 run_id,date,policy,checkpoint_steps,train_episodes,train_frames,eval_horizon_s,placement_regime,trials,successes,success_rate,amp,power_mode,comparable,notes
 act_30k_exploratory_30s,2026-07-23,act,30000,30,17970,30,unspecified,10,2,0.2,false,25W,false,"Exploratory run; 30 s horizon and unstandardized placements"
+act_10ep_30k_screening_20s,2026-08-05,act,30000,10,5990,20,fixed_with_small_natural_variation,5,2,0.4,false,25W,false,"Exploratory n=5 screening; not a reportable success-rate estimate"
+act_20ep_30k_screening_20s,2026-08-05,act,30000,20,11980,20,fixed_with_small_natural_variation,5,3,0.6,false,25W,false,"Exploratory n=5 screening; not a reportable success-rate estimate"
+act_30ep_30k_screening_20s,2026-08-05,act,30000,30,17970,20,fixed_with_small_natural_variation,5,0,0.0,false,25W,false,"Exploratory n=5 screening; not a reportable success-rate estimate"

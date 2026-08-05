@@ -7,3 +7,10 @@ eval_act_30ep_30k_protocol_v1,1,fixed,fixed_reference_yellow,fixed_reference_red
 eval_act_30ep_30k_protocol_v1,2,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,false,placement_miss,,,"Grasp was off-center, causing excessive placement error and the yellow cube rolled off"
 eval_act_30ep_30k_protocol_v1,3,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,false,placement_miss,,,"Released too high with substantial lateral error from the red cube center, and the yellow cube rolled away"
 eval_act_30ep_30k_protocol_v1,4,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,false,grasp_failure,,,"Multiple grasp attempts within 20 seconds; none secured the yellow cube"
+eval_act_10ep_30k_protocol_v1,3,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,false,grasp_failure,,,Multiple grasp attempts within 20 seconds; none secured the yellow cube
+eval_act_20ep_30k_protocol_v1,3,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,false,unstable_stack,,,Released the yellow cube too high; it landed but rolled off before the 3-second stability criterion
+eval_act_30ep_30k_protocol_v1,5,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,false,unstable_stack,,,The yellow cube was placed on the red cube but rolled off before the 3-second stability criterion
+eval_act_10ep_30k_protocol_v1,4,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,true,,,,Successful stack with comparatively smooth motion
+eval_act_20ep_30k_protocol_v1,4,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,true,,,,Successful stack
+eval_act_10ep_30k_protocol_v1,5,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,false,grasp_failure,,,Multiple grasp attempts within 20 seconds; none secured the yellow cube
+eval_act_20ep_30k_protocol_v1,5,fixed,visible_natural_layout,visible_natural_layout,0.0,0.0,true,,,,Successful stack

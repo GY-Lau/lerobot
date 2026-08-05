@@ -117,3 +117,29 @@ schedule from `evaluation_protocol.md`. Report:
 
 Training loss is a diagnostic, not the data-efficiency result. The primary
 comparison is physical success under the unchanged 20-second protocol.
+
+## Exploratory physical screening
+
+An initial five-trial screen was completed for each checkpoint on 2026-08-05.
+Cube placement was held to the same small natural range and remained within
+the camera view; the videos and per-trial labels are retained. This sample is
+useful for finding failure modes, but is too small for a reportable ranking.
+
+| Unique episodes | Success | Wilson 95% CI | Observed failures |
+| ---: | ---: | ---: | --- |
+| 10 | 2/5 (40%) | 11.8%-76.9% | 3 grasp failures |
+| 20 | 3/5 (60%) | 23.1%-88.2% | 2 unstable stacks |
+| 30 | 0/5 (0%) | 0.0%-43.4% | 2 placement misses; 1 transit drop; 1 grasp failure; 1 unstable stack |
+
+The intervals overlap substantially. The screen therefore does not establish
+that 20 episodes outperform 10 or 30, or that additional demonstrations hurt.
+The 30-episode checkpoint's mixed failures are instead a concrete prompt to
+inspect demonstration quality, placement coverage, and seed sensitivity.
+
+Latency was effectively matched across all three checkpoints. After warmup,
+command P50/P95 was about 15.4/16.7 ms, effective control rate was 29.3 FPS,
+and the deadline-miss rate was 0.9% for every run. Action-chunk refreshes took
+about 100-102 ms at P50, while cached-action policy time was about 11.7 ms.
+Thus the observed success differences are not explained by one checkpoint
+running slower. Exact machine-readable values are in
+`act_physical_screening.csv`.

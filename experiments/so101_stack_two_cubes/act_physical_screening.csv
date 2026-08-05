@@ -1,0 +1,4 @@
+run_id,train_episodes,trials,successes,success_rate,ci95_low,ci95_high,failure_counts,latency_frames,refresh_frames,cached_frames,command_p50_ms,command_p95_ms,refresh_policy_p50_ms,refresh_policy_p95_ms,cached_policy_p50_ms,effective_fps,deadline_miss_rate,screening_status
+eval_act_10ep_30k_protocol_v1,10,5,2,0.400000,0.117618,0.769280,"{""grasp_failure"":3}",2704,25,2679,15.381,16.683,100.434,103.515,11.709,29.318,0.009246,exploratory_n5_not_reportable
+eval_act_20ep_30k_protocol_v1,20,5,3,0.600000,0.230720,0.882382,"{""unstable_stack"":2}",2703,25,2678,15.446,16.684,99.895,105.400,11.763,29.317,0.009249,exploratory_n5_not_reportable
+eval_act_30ep_30k_protocol_v1,30,5,0,0.000000,-0.000000,0.434491,"{""drop_in_transit"":1,""grasp_failure"":1,""placement_miss"":2,""unstable_stack"":1}",2703,25,2678,15.427,16.702,102.418,104.860,11.735,29.308,0.009249,exploratory_n5_not_reportable

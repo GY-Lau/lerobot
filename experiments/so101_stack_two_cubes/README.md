@@ -68,6 +68,10 @@ placement protocol was not yet standardized.
   trial at a time.
 - [`summarize_trials.py`](summarize_trials.py): success rates, Wilson 95%
   confidence intervals, and failure counts.
+- [`summarize_act_screening.py`](summarize_act_screening.py): joins the complete
+  five-trial-per-checkpoint ACT screen with its measured latency logs.
+- [`act_physical_screening.csv`](act_physical_screening.csv): machine-readable
+  exploratory outcomes, confidence intervals, failures, and control latency.
 - [`summarize_latency.py`](summarize_latency.py): mean/P50/P95 control latency,
   deadline misses, and action-chunk refresh versus cached-action timing.
 - [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation

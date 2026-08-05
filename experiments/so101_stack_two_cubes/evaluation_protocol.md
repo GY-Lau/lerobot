@@ -12,6 +12,10 @@ the setup between policies.
 - Run at least 30 trials for a reportable result.
 - Record every trial, including failures.
 
+A smaller five-trial run may be labeled an exploratory screen for debugging
+and failure-mode discovery. It must not be presented as a reportable policy
+ranking; the completed ACT 10/20/30 screen follows this distinction.
+
 ## Reference arm pose
 
 The reference pose is the per-joint median of frame zero from all 30 original

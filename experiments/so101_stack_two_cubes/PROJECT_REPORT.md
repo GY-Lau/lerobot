@@ -32,8 +32,8 @@ not silently cleaned after training.
 
 | Workstream | Verified evidence | Current status | Missing gate |
 | --- | --- | --- | --- |
-| ACT baseline | 30k-step checkpoint; exact config and files pass the checkpoint contract | Training complete | Standardized 30-trial physical evaluation |
-| ACT data efficiency | Deterministic nested 10/20/30 subsets; all three matched 30k-step checkpoints pass | Training complete | Same paired physical schedule for every checkpoint |
+| ACT baseline | 30k-step checkpoint; exact config and files pass the checkpoint contract | Training complete; exploratory physical screen complete | Reportable physical evaluation if a precise rate estimate is needed |
+| ACT data efficiency | Deterministic nested 10/20/30 subsets; all three matched 30k-step checkpoints pass | Five-trial screen complete for every checkpoint | Larger paired sample before ranking checkpoints |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA PEFT | Two-task protocol, merge validator, LoRA launcher, and isolated Jetson environment check | Infrastructure ready | Record 30 real inverse-task demonstrations, then smoke test and train |
@@ -55,14 +55,33 @@ positions.
 
 Final minibatch loss is recorded for diagnosis only. It is not monotonic in
 unique demonstrations, and smaller subsets repeat their frames more often.
-The reportable data-efficiency result will be physical success rate with Wilson
-95% confidence intervals under the unchanged schedule.
+The initial physical screen produced the following results under the unchanged
+20-second horizon:
+
+| Unique episodes | Success | Wilson 95% CI | Main observed failures |
+| ---: | ---: | ---: | --- |
+| 10 | 2/5 (40%) | 11.8%-76.9% | grasp failure (3) |
+| 20 | 3/5 (60%) | 23.1%-88.2% | unstable stack (2) |
+| 30 | 0/5 (0%) | 0.0%-43.4% | mixed: placement, drop, grasp, stack |
+
+These are exploratory screening results, not reportable success-rate
+estimates. The intervals overlap, so this does not establish a best dataset
+size or show that more demonstrations reduce performance. It does identify a
+non-monotonic result worth investigating with better-curated data and a larger
+paired evaluation.
 
 The guarded physical runner prevents a common evaluation error: changing the
 run label while accidentally loading the 30-episode checkpoint for every test.
 It maps `10`, `20`, or `30` to the correct model, validates the training
 contract, checks the follower pose, records one 20-second episode, and stores a
 separate latency log.
+
+All three ACT checkpoints ran at essentially the same measured speed after
+warmup: command P50/P95 was approximately 15.4/16.7 ms, effective rate was
+29.3 FPS, and deadline misses were 0.9%. Their approximately 100 ms action-
+chunk refreshes occurred on only 25 of roughly 2,700 analyzed frames per run.
+The physical outcome differences therefore are not attributable to different
+inference throughput.
 
 ## ACT versus Diffusion on Jetson
 
@@ -133,7 +152,7 @@ Run the experiment-level tests on the Jetson environment:
   -s experiments/so101_stack_two_cubes -p 'test_*.py'
 ```
 
-The current suite has 25 passing tests, covering trial logging, summaries,
+The current suite has 28 passing tests, covering trial logging, summaries,
 placement analysis, subset construction, language-dataset validation,
 checkpoint contracts, model-to-evaluation-run mapping, and artifact hashing.
 
@@ -160,12 +179,13 @@ hashes before the publication status is changed from `local_only`.
 | ACT 10/20/30 checkpoints | Jetson `outputs/train/`; hashes in `model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
+| ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
 Claims not yet supported:
 
-- that 10, 20, or 30 demonstrations has the best physical success rate;
+- that 10, 20, or 30 demonstrations has the best reportable physical success rate;
 - that ACT outperforms Diffusion in task success;
 - that SmolVLA follows language commands;
 - that voice input controls the robot;
@@ -173,8 +193,8 @@ Claims not yet supported:
 
 ## Next evidence gates
 
-1. Run the paired 30-trial physical schedule for ACT 10/20/30 and publish the
-   success, failure, and latency summaries.
+1. If a statistically reportable data-efficiency ranking is needed, expand the
+   completed five-trial screen to the paired 30-trial schedule.
 2. Decide whether the Diffusion comparison uses non-Jetson inference or a
    separately disclosed asynchronous/smaller deployment experiment.
 3. Record and audit 30 red-on-yellow demonstrations.
