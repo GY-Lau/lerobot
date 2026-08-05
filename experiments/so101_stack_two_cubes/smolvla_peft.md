@@ -29,11 +29,16 @@ confounded with position.
 Each invocation records one auditable episode and resumes the same dataset:
 
 ```bash
+bash experiments/so101_stack_two_cubes/record_inverse_language_data.sh --status
+
 bash experiments/so101_stack_two_cubes/record_inverse_language_data.sh
 ```
 
 Repeat until 30 successful demonstrations have been retained. Failed or
 interrupted demonstrations should not silently remain in the training set.
+The recorder reports the current count and refuses to create episode 31. Since
+the Jetson is headless, judge each attempt immediately and stop before the next
+one if the saved episode needs to be reviewed or removed.
 
 ## 2. Merge and validate the language dataset
 

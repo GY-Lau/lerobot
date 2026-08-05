@@ -89,7 +89,8 @@ placement protocol was not yet standardized.
 - [`smolvla_peft.md`](smolvla_peft.md): evidence-gated two-task language-control
   design, PEFT training protocol, and text-before-voice evaluation matrix.
 - [`record_inverse_language_data.sh`](record_inverse_language_data.sh):
-  one-episode recorder for the red-on-yellow inverse behavior.
+  progress-aware one-episode recorder for the red-on-yellow inverse behavior;
+  it stops at the declared 30-episode target.
 - [`prepare_language_dataset.sh`](prepare_language_dataset.sh): guarded merge
   of the two color orders into one balanced multi-task dataset.
 - [`validate_language_dataset.py`](validate_language_dataset.py): verifies
