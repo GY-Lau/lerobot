@@ -1,1 +1,4 @@
 run_id,trial_index,placement_regime,yellow_position,red_position,yellow_yaw_deg,red_yaw_deg,success,failure_label,completion_time_s,video_path,notes
+eval_act_10ep_30k_protocol_v1,1,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,true,,,,
+eval_act_20ep_30k_protocol_v1,1,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,true,,,,Two grasp attempts; succeeded on the second attempt
+eval_act_30ep_30k_protocol_v1,1,fixed,fixed_reference_yellow,fixed_reference_red,0.0,0.0,false,drop_in_transit,,,"Two grasp attempts; first grasp succeeded but the yellow cube dropped during transport; second attempt did not complete"
