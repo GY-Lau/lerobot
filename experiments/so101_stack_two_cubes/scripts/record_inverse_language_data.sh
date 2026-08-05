@@ -127,4 +127,5 @@ done
 echo "Recording one 20-second demonstration: red cube on yellow cube."
 echo "Progress before recording: $episode_count/30; this will create episode $(( episode_count + 1 ))."
 echo "Repeat this command until the dataset contains 30 successful episodes."
+echo "Loading LeRobot modules on Jetson takes about 25-30 seconds; recording starts after 'Recording episode'."
 exec "${record_cmd[@]}"

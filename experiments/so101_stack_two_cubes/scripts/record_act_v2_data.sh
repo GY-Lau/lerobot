@@ -127,4 +127,5 @@ done
 "$python_bin" "$script_dir/check_start_pose.py" --profile relaxed
 echo "ACT v2 episode $(( episode_count + 1 ))/$target_episodes: yellow cube on red cube."
 echo "Keep both cubes visible; use a clean single attempt; lower and center before release."
+echo "Loading LeRobot modules on Jetson takes about 25-30 seconds; recording starts after 'Recording episode'."
 exec "${record_cmd[@]}"
