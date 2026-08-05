@@ -44,6 +44,15 @@ def verify_checkpoint(
 
     train_config = json.loads((model_dir / "train_config.json").read_text(encoding="utf-8"))
     training_step = int(json.loads(step_path.read_text(encoding="utf-8"))["step"])
+    configured_episodes = train_config["dataset"].get("episodes")
+    if configured_episodes is None:
+        # LeRobot serializes an omitted --dataset.episodes as null, meaning the
+        # complete dataset rather than an empty subset. Resolve that shorthand
+        # against the immutable subset manifest so the 30-episode baseline can
+        # be checked by the same contract as the explicit 10/20 subsets.
+        configured_episodes = list(range(int(manifest["total_episodes"])))
+    else:
+        configured_episodes = sorted(int(index) for index in configured_episodes)
     checks = {
         "training_step": (training_step, expected_steps),
         "configured_steps": (int(train_config["steps"]), expected_steps),
@@ -55,7 +64,7 @@ def verify_checkpoint(
             manifest["dataset_repo_id"],
         ),
         "dataset_episodes": (
-            sorted(int(index) for index in train_config["dataset"]["episodes"]),
+            configured_episodes,
             expected_episodes,
         ),
         "policy_type": (train_config["policy"]["type"], "act"),

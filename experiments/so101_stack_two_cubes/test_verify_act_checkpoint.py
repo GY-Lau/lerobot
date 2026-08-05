@@ -34,6 +34,7 @@ class VerifyActCheckpointTest(unittest.TestCase):
             json.dumps(
                 {
                     "dataset_repo_id": "example/data",
+                    "total_episodes": 2,
                     "subsets": {"2": {"episodes": [0, 2]}},
                 }
             ),
@@ -66,6 +67,28 @@ class VerifyActCheckpointTest(unittest.TestCase):
             config_path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "dataset_episodes"):
                 verify_checkpoint(checkpoint, manifest_path=manifest, episode_count=2)
+
+    def test_null_episode_list_means_complete_dataset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint, manifest = self.make_checkpoint(Path(tmp))
+            config_path = checkpoint / "pretrained_model" / "train_config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["dataset"]["episodes"] = None
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "dataset_repo_id": "example/data",
+                        "total_episodes": 2,
+                        "subsets": {"2": {"episodes": [0, 1]}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = verify_checkpoint(checkpoint, manifest_path=manifest, episode_count=2)
+            self.assertEqual(result["episodes"], [0, 1])
 
 
 if __name__ == "__main__":

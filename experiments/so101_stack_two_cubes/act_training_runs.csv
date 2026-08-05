@@ -1,0 +1,4 @@
+run_id,unique_episodes,optimizer_steps,batch_size,sampled_frames,seed,use_amp,final_logged_loss,loss_source,wall_time,checkpoint_contract,notes
+act_stack_two_cubes_10ep_30k,10,30000,2,60000,1000,false,0.123,systemd_journal_lerobot-act-10ep-30k,04:26:39,PASS,"Completed 2026-08-05; deterministic subset manifest"
+act_stack_two_cubes_20ep_30k,20,30000,2,60000,1000,false,0.153,systemd_journal_lerobot-act-20ep-after-10,04:29:55,PASS,"Completed 2026-08-05; deterministic subset manifest"
+act_stack_two_cubes_30k,30,30000,2,60000,1000,false,0.173,original_interactive_training_log,not_recorded,PASS,"Authoritative original baseline; dataset.episodes=null means all 30 episodes"

@@ -85,6 +85,24 @@ batch size, seed, policy type, AMP setting, optimizer learning rate, scheduler,
 and required model/processor files. A directory merely existing is not evidence
 that the run completed.
 
+## Completed training runs
+
+All three matched-budget checkpoints now pass `verify_act_checkpoint.py`:
+
+| Unique episodes | Steps | Sampled frames | Final logged loss | Wall time | Contract |
+| ---: | ---: | ---: | ---: | ---: | :---: |
+| 10 | 30,000 | 60,000 | 0.123 | 04:26:39 | PASS |
+| 20 | 30,000 | 60,000 | 0.153 | 04:29:55 | PASS |
+| 30 | 30,000 | 60,000 | 0.173 | not recorded | PASS |
+
+The 10/20 losses and wall times come from their retained user-systemd journals;
+the 30-episode loss was retained from the original interactive training log.
+`act_training_runs.csv` records these sources and the matched configuration.
+The non-monotonic final minibatch loss is not a performance ranking: it is one
+stochastic training measurement, and the smaller subsets repeat their frames
+more often. Physical success under the common trial schedule remains the
+data-efficiency endpoint.
+
 ## Evaluation and reporting
 
 Evaluate all three checkpoints on the exact same paired physical trial

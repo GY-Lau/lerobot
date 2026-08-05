@@ -52,6 +52,8 @@ placement protocol was not yet standardized.
   10/20/30 episode training launcher matched to the 30-episode baseline.
 - [`verify_act_checkpoint.py`](verify_act_checkpoint.py): validates final files,
   training step, subset membership, and the matched ACT training contract.
+- [`act_training_runs.csv`](act_training_runs.csv): completed 10/20/30-episode
+  matched-budget ACT runs, retained loss sources, and checkpoint verification.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the
