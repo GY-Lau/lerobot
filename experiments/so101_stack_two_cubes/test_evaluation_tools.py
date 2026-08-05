@@ -3,7 +3,14 @@ import unittest
 from pathlib import Path
 
 from generate_trial_plan import generate_plan, validate_cells
-from log_trial import FIELDNAMES, append_trial, next_trial_index, read_rows, validate_outcome
+from log_trial import (
+    FIELDNAMES,
+    append_trial,
+    next_trial_index,
+    read_rows,
+    validate_outcome,
+    validate_trial_has_recorded_episode,
+)
 from summarize_trials import summarize, wilson_interval
 
 
@@ -56,6 +63,17 @@ class EvaluationToolsTest(unittest.TestCase):
             append_trial(path, row)
             with self.assertRaisesRegex(ValueError, "Duplicate trial"):
                 append_trial(path, row)
+
+    def test_result_requires_corresponding_recorded_episode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dataset_root = Path(tmp_dir) / "dataset"
+            info_path = dataset_root / "meta" / "info.json"
+            info_path.parent.mkdir(parents=True)
+            info_path.write_text('{"total_episodes": 2}', encoding="utf-8")
+
+            validate_trial_has_recorded_episode(dataset_root, 2)
+            with self.assertRaisesRegex(ValueError, "contains only 2 recorded episode"):
+                validate_trial_has_recorded_episode(dataset_root, 3)
 
     def test_wilson_interval_for_two_of_ten(self) -> None:
         low, high = wilson_interval(2, 10)

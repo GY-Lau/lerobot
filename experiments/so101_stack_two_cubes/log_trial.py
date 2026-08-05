@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 
@@ -61,6 +62,20 @@ def validate_outcome(success: bool, failure_label: str | None) -> None:
         raise ValueError("A failed trial requires --failure-label.")
 
 
+def validate_trial_has_recorded_episode(dataset_root: Path, trial_index: int) -> None:
+    """Reject result rows that do not have a corresponding recorded episode."""
+    info_path = dataset_root / "meta" / "info.json"
+    if not info_path.is_file():
+        return
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    total_episodes = int(info["total_episodes"])
+    if trial_index > total_episodes:
+        raise ValueError(
+            f"Cannot log trial {trial_index}: dataset {dataset_root} contains only "
+            f"{total_episodes} recorded episode(s). Correct the existing row instead of appending."
+        )
+
+
 def append_trial(path: Path, row: dict[str, object]) -> None:
     rows = read_rows(path)
     identity = (str(row["run_id"]), str(row["trial_index"]))
@@ -91,6 +106,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--video-path", default="")
     parser.add_argument("--notes", default="")
     parser.add_argument("--trials-path", type=Path, default=DEFAULT_TRIALS_PATH)
+    parser.add_argument(
+        "--dataset-root",
+        type=Path,
+        help="Evaluation dataset root. Defaults to the local GY-William cache for RUN_ID when present.",
+    )
     return parser.parse_args()
 
 
@@ -101,6 +121,10 @@ def main() -> int:
     trial_index = args.trial_index or next_trial_index(rows, args.run_id)
     if trial_index < 1:
         raise ValueError("Trial index must be positive.")
+    dataset_root = args.dataset_root or (
+        Path.home() / ".cache" / "huggingface" / "lerobot" / "GY-William" / args.run_id
+    )
+    validate_trial_has_recorded_episode(dataset_root, trial_index)
 
     row = {
         "run_id": args.run_id,
@@ -123,4 +147,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
