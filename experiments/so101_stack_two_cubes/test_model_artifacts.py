@@ -47,6 +47,7 @@ class ModelArtifactInventoryTest(unittest.TestCase):
 
             output = root / "inventory.csv"
             write_inventory(output, [row])
+            self.assertNotIn(b"\r", output.read_bytes())
             with output.open(newline="", encoding="utf-8") as stream:
                 saved = list(csv.DictReader(stream))
             self.assertEqual(saved[0]["artifact_id"], "test_act")

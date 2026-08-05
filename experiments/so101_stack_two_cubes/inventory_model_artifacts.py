@@ -94,7 +94,7 @@ def collect_artifact(repo_root: Path, spec: ArtifactSpec) -> dict[str, object]:
 def write_inventory(path: Path, rows: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES)
+        writer = csv.DictWriter(stream, fieldnames=FIELDNAMES, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
