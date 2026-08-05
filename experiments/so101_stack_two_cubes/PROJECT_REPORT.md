@@ -125,7 +125,7 @@ added. This isolates policy grounding errors from ASR errors.
 Verify the ACT checkpoints:
 
 ```bash
-python experiments/so101_stack_two_cubes/verify_act_checkpoint.py \
+python experiments/so101_stack_two_cubes/scripts/verify_act_checkpoint.py \
   outputs/train/act_stack_two_cubes_10ep_30k/checkpoints/030000 \
   --episode-count=10
 ```
@@ -133,14 +133,14 @@ python experiments/so101_stack_two_cubes/verify_act_checkpoint.py \
 Preview a physical data-efficiency trial without moving the robot:
 
 ```bash
-bash experiments/so101_stack_two_cubes/run_act_data_efficiency_trial.sh \
+bash experiments/so101_stack_two_cubes/scripts/run_act_data_efficiency_trial.sh \
   --dry-run 10 false
 ```
 
 Recompute one Diffusion latency summary from its raw log:
 
 ```bash
-python experiments/so101_stack_two_cubes/summarize_latency.py \
+python experiments/so101_stack_two_cubes/scripts/summarize_latency.py \
   outputs/eval_latency/eval_diffusion_30k_n5_amp_fixed_30s.csv \
   --include-warmup
 ```
@@ -149,16 +149,17 @@ Run the experiment-level tests on the Jetson environment:
 
 ```bash
 /home/hai/miniconda3/envs/lerobot/bin/python -m unittest discover \
-  -s experiments/so101_stack_two_cubes -p 'test_*.py'
+  -s experiments/so101_stack_two_cubes/tests -p 'test_*.py'
 ```
 
-The current suite has 28 passing tests, covering trial logging, summaries,
+The current suite has 46 passing tests, covering directory layout and links,
+trial logging, summaries,
 placement analysis, subset construction, language-dataset validation,
 checkpoint contracts, model-to-evaluation-run mapping, and artifact hashing.
 
 Every completed model weight file and its training configuration have been
 hashed directly on the Jetson. The exact values are in
-`model_artifacts.csv`; abbreviated model hashes are shown here for orientation:
+`results/model_artifacts.csv`; abbreviated model hashes are shown here for orientation:
 
 | Artifact | Model bytes | Model SHA-256 prefix |
 | --- | ---: | --- |
@@ -176,8 +177,8 @@ hashes before the publication status is changed from `local_only`.
 | Artifact | Current location | Publication status |
 | --- | --- | --- |
 | v1 demonstrations | Hugging Face repo ID above and Jetson cache | Dataset repo identified; accessibility should be checked before external release |
-| ACT 10/20/30 checkpoints | Jetson `outputs/train/`; hashes in `model_artifacts.csv` | Complete locally; Hub model publication pending |
-| Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `model_artifacts.csv` | Complete locally; Hub model publication pending |
+| ACT 10/20/30 checkpoints | Jetson `outputs/train/`; hashes in `results/model_artifacts.csv` | Complete locally; Hub model publication pending |
+| Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `results/model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
 | ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
 | ACT v2 demonstrations | Independent 50-episode clean-collection protocol with progress limit and backed-up rejection of the last attempt | Recorder ready; collection pending |
