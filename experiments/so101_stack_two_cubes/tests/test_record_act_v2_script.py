@@ -33,6 +33,14 @@ class RecordActV2ScriptTest(unittest.TestCase):
         (meta / "info.json").write_text(
             json.dumps({"total_episodes": count}), encoding="utf-8"
         )
+        if count > 0:
+            (meta / "tasks.parquet").touch()
+            episodes = meta / "episodes" / "chunk-000"
+            episodes.mkdir(parents=True)
+            (episodes / "file-000.parquet").touch()
+            data = home / REPO_ID / "data" / "chunk-000"
+            data.mkdir(parents=True)
+            (data / "file-000.parquet").touch()
 
     def test_status_reports_empty_dataset(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -56,6 +64,14 @@ class RecordActV2ScriptTest(unittest.TestCase):
             result = self.run_script(home, "--dry-run")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("refusing to exceed", result.stderr)
+
+    def test_status_identifies_incomplete_zero_episode_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.write_count(home, 0)
+            result = self.run_script(home, "--status")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("incomplete empty directory detected", result.stdout)
 
 
 if __name__ == "__main__":

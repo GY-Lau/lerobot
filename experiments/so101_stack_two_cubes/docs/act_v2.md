@@ -35,6 +35,11 @@ bash experiments/so101_stack_two_cubes/scripts/discard_last_act_v2_episode.sh 12
 
 The removal path retains the original dataset as a backup.
 
+If an interrupted first attempt leaves a zero-episode directory containing
+only partial metadata, the recorder detects it, preserves it with an
+`_incomplete_<timestamp>` suffix, and creates a fresh dataset instead of
+incorrectly passing `--resume=true`.
+
 ## Audit and nested subsets
 
 After exactly 50 accepted episodes, extract first-frame cube positions, require

@@ -46,6 +46,32 @@ if [[ ! "$episode_count" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+if [[ -d "$dataset_root" && "$episode_count" == 0 ]]; then
+  if "$status_only"; then
+    echo "ACT v2 dataset: 0/$target_episodes recorded episodes (incomplete empty directory detected)"
+    echo "root: $dataset_root"
+    echo "The next recording attempt will preserve this directory as a backup and create a clean dataset."
+    exit 0
+  fi
+  incomplete_backup="${dataset_root}_incomplete_$(date +%Y%m%d_%H%M%S)"
+  if "$dry_run"; then
+    echo "Would preserve incomplete zero-episode dataset at: $incomplete_backup"
+  else
+    mv -- "$dataset_root" "$incomplete_backup"
+    echo "Preserved incomplete zero-episode dataset at: $incomplete_backup"
+  fi
+fi
+
+if (( episode_count > 0 )); then
+  if [[ ! -f "$dataset_root/meta/tasks.parquet" ]] \
+    || ! find "$dataset_root/meta/episodes" -type f -name '*.parquet' -print -quit | grep -q . \
+    || ! find "$dataset_root/data" -type f -name '*.parquet' -print -quit | grep -q .; then
+    echo "ACT v2 metadata is incomplete despite declaring $episode_count episodes; refusing to resume." >&2
+    echo "Review and repair or explicitly archive: $dataset_root" >&2
+    exit 1
+  fi
+fi
+
 if "$status_only"; then
   echo "ACT v2 dataset: $episode_count/$target_episodes recorded episodes"
   echo "root: $dataset_root"
@@ -77,7 +103,7 @@ record_cmd=(
   --display_data=false
 )
 
-if [[ -f "$dataset_root/meta/info.json" ]]; then
+if (( episode_count > 0 )); then
   record_cmd+=(--resume=true)
 fi
 
