@@ -66,6 +66,8 @@ placement protocol was not yet standardized.
   deadline misses, and action-chunk refresh versus cached-action timing.
 - [`run_act_trial.sh`](run_act_trial.sh): pose-gated, one-episode ACT evaluation
   with automatic dataset resume.
+- [`run_act_data_efficiency_trial.sh`](run_act_data_efficiency_trial.sh): maps
+  10/20/30 episodes to the verified checkpoint and a distinct evaluation run.
 - [`analyze_cube_placements.py`](analyze_cube_placements.py): marker-free red
   and yellow cube localization in normalized camera coordinates.
 - [`diffusion_policy.md`](diffusion_policy.md): matched-comparison design and

@@ -58,6 +58,23 @@ Run the same command again after physically resetting the arm and cubes. The
 runner detects the existing local dataset and appends one episode. Using one
 episode per invocation avoids an uncontrolled reset phase between trials.
 
+For the matched 10/20/30-episode ACT comparison, use the guarded wrapper rather
+than editing model paths by hand:
+
+```bash
+bash experiments/so101_stack_two_cubes/run_act_data_efficiency_trial.sh \
+  --dry-run 10 false
+
+bash experiments/so101_stack_two_cubes/run_act_data_efficiency_trial.sh \
+  10 false
+```
+
+Replace `10` with `20` or `30` for the other checkpoints. The wrapper maps the
+episode count to a distinct evaluation dataset, verifies the exact 30,000-step
+training contract, and then delegates to the same pose-gated 20-second runner.
+Use `false` for all three reportable runs so AMP is not another changing
+variable. Complete the same 30-trial placement schedule for each checkpoint.
+
 ## Success definition
 
 A trial succeeds when all conditions hold:

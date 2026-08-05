@@ -5,11 +5,11 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  run_act_trial.sh [--dry-run] RUN_ID [CHECKPOINT] [USE_AMP]
+  run_act_trial.sh [--dry-run] RUN_ID [CHECKPOINT] [USE_AMP] [TRAIN_RUN]
 
 Examples:
   run_act_trial.sh eval_act_30k_fixed_20s 030000 false
-  run_act_trial.sh eval_act_60k_fixed_20s 060000 true
+  run_act_trial.sh eval_act_10ep_30k_protocol_v1 030000 false act_stack_two_cubes_10ep_30k
 
 Each invocation records exactly one 20-second episode. Reusing RUN_ID appends
 one episode to the same local evaluation dataset.
@@ -22,7 +22,7 @@ if [[ "${1:-}" == "--dry-run" ]]; then
   shift
 fi
 
-if [[ $# -lt 1 || $# -gt 3 ]]; then
+if [[ $# -lt 1 || $# -gt 4 ]]; then
   usage >&2
   exit 2
 fi
@@ -30,6 +30,7 @@ fi
 run_id="$1"
 checkpoint="${2:-030000}"
 use_amp="${3:-false}"
+train_run="${4:-act_stack_two_cubes_30k}"
 
 if [[ ! "$run_id" =~ ^[a-zA-Z0-9._-]+$ ]]; then
   echo "RUN_ID may contain only letters, numbers, dot, underscore, and hyphen." >&2
@@ -47,12 +48,16 @@ if [[ "$use_amp" != "true" && "$use_amp" != "false" ]]; then
   echo "USE_AMP must be true or false." >&2
   exit 2
 fi
+if [[ ! "$train_run" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+  echo "TRAIN_RUN may contain only letters, numbers, dot, underscore, and hyphen." >&2
+  exit 2
+fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "$script_dir/../.." && pwd)"
 python_bin="${LEROBOT_PYTHON:-/home/hai/miniconda3/envs/lerobot/bin/python}"
 record_bin="$(dirname -- "$python_bin")/lerobot-record"
-model="$repo_root/outputs/train/act_stack_two_cubes_30k/checkpoints/$checkpoint/pretrained_model"
+model="$repo_root/outputs/train/$train_run/checkpoints/$checkpoint/pretrained_model"
 dataset_base="${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}"
 dataset_root="$dataset_base/GY-William/$run_id"
 latency_log="$repo_root/outputs/eval_latency/$run_id.csv"
@@ -106,6 +111,6 @@ echo "Checking the follower start pose..."
 "$python_bin" "$script_dir/check_start_pose.py" --profile relaxed
 
 echo
-echo "Starting one ACT evaluation trial: $run_id ($checkpoint, AMP=$use_amp)"
+echo "Starting one ACT evaluation trial: $run_id ($train_run/$checkpoint, AMP=$use_amp)"
 echo "Keep hands clear and be ready to stop the robot."
 "${record_cmd[@]}"
