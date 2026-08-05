@@ -36,6 +36,8 @@ placement protocol was not yet standardized.
 
 ## Reproducibility artifacts
 
+- [`PROJECT_REPORT.md`](PROJECT_REPORT.md): portfolio-facing evidence report
+  with verified results, unsupported-claim boundaries, and remaining gates.
 - [`evaluation_protocol.md`](evaluation_protocol.md): success definition,
   placement regimes, and failure taxonomy.
 - [`data_audit.md`](data_audit.md): structural, start-pose, and visual audit of
