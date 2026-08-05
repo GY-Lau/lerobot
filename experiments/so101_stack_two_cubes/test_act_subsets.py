@@ -45,6 +45,13 @@ class ActSubsetTest(unittest.TestCase):
             self.make_positions(path)
             self.assertEqual(build_manifest(path, [3, 6]), build_manifest(path, [3, 6]))
 
+    def test_manifest_records_selected_dataset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "positions.csv"
+            self.make_positions(path)
+            manifest = build_manifest(path, [3, 6], "example/act_v2")
+            self.assertEqual(manifest["dataset_repo_id"], "example/act_v2")
+
     def test_largest_subset_must_include_all_episodes(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "positions.csv"

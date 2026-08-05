@@ -44,6 +44,8 @@ placement protocol was not yet standardized.
   the original 30 demonstrations.
 - [`act_data_efficiency.md`](act_data_efficiency.md): controlled 10/20/30
   episode ACT ablation and matched-budget interpretation rules.
+- [`act_v2.md`](act_v2.md): independent clean 50-episode collection, nested
+  30/50 subset audit, and matched ACT improvement protocol.
 - [`training_start_positions.csv`](training_start_positions.csv): per-episode
   marker-free cube detections used to construct the ACT subsets.
 - [`act_data_subsets.json`](act_data_subsets.json): deterministic nested episode
@@ -95,6 +97,10 @@ placement protocol was not yet standardized.
   the independent 50-episode, higher-quality yellow-on-red ACT v2 dataset.
 - [`discard_last_act_v2_episode.sh`](discard_last_act_v2_episode.sh): guarded
   removal of a failed final v2 demonstration with the original data retained.
+- [`prepare_act_v2_subsets.sh`](prepare_act_v2_subsets.sh): audits all 50 v2
+  start frames and generates spatially balanced nested 30/50 subsets.
+- [`train_act_v2.sh`](train_act_v2.sh): matched-contract ACT v2 trainer for the
+  audited 30- and 50-episode subsets.
 - [`prepare_language_dataset.sh`](prepare_language_dataset.sh): guarded merge
   of the two color orders into one balanced multi-task dataset.
 - [`validate_language_dataset.py`](validate_language_dataset.py): verifies

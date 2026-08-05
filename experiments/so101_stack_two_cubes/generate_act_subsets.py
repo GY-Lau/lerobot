@@ -73,7 +73,11 @@ def _farthest_order(indices: list[int], features: dict[int, np.ndarray]) -> list
     return selected
 
 
-def build_manifest(path: Path, sizes: list[int]) -> dict[str, object]:
+def build_manifest(
+    path: Path,
+    sizes: list[int],
+    dataset_repo_id: str = "GY-William/lerobot_stack_two_cubes",
+) -> dict[str, object]:
     episodes = _read_episodes(path)
     total = len(episodes)
     if sorted(set(sizes)) != sizes or any(size < 1 or size > total for size in sizes):
@@ -105,7 +109,7 @@ def build_manifest(path: Path, sizes: list[int]) -> dict[str, object]:
         }
 
     return {
-        "dataset_repo_id": "GY-William/lerobot_stack_two_cubes",
+        "dataset_repo_id": dataset_repo_id,
         "source_positions_csv": path.name,
         "source_positions_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "algorithm": "quality-stratified nested farthest-point traversal v1",
@@ -121,11 +125,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("positions_csv", type=Path)
     parser.add_argument("--sizes", type=int, nargs="+", default=[10, 20, 30])
+    parser.add_argument(
+        "--dataset-repo-id",
+        default="GY-William/lerobot_stack_two_cubes",
+        help="Dataset identity stored in the generated training contract",
+    )
     parser.add_argument("--output", type=Path, default=Path(__file__).with_name("act_data_subsets.json"))
     parser.add_argument("--check", action="store_true", help="Verify that --output matches recomputed content")
     args = parser.parse_args()
 
-    manifest = build_manifest(args.positions_csv, args.sizes)
+    manifest = build_manifest(args.positions_csv, args.sizes, args.dataset_repo_id)
     if args.check:
         existing = json.loads(args.output.read_text(encoding="utf-8"))
         if existing != manifest:
