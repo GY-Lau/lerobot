@@ -133,17 +133,32 @@ Run the experiment-level tests on the Jetson environment:
   -s experiments/so101_stack_two_cubes -p 'test_*.py'
 ```
 
-The current suite has 23 passing tests, covering trial logging, summaries,
+The current suite has 25 passing tests, covering trial logging, summaries,
 placement analysis, subset construction, language-dataset validation,
-checkpoint contracts, and model-to-evaluation-run mapping.
+checkpoint contracts, model-to-evaluation-run mapping, and artifact hashing.
+
+Every completed model weight file and its training configuration have been
+hashed directly on the Jetson. The exact values are in
+`model_artifacts.csv`; abbreviated model hashes are shown here for orientation:
+
+| Artifact | Model bytes | Model SHA-256 prefix |
+| --- | ---: | --- |
+| ACT 10 episodes / 30k | 206,699,736 | `be726501b854` |
+| ACT 20 episodes / 30k | 206,699,736 | `3db523867a63` |
+| ACT 30 episodes / 30k | 206,699,736 | `7d035e4a0c4c` |
+| Diffusion 30 episodes / 30k | 1,051,838,640 | `39a77bdf9809` |
+
+These hashes identify the current local artifacts; they do not by themselves
+make the models public. After Hub upload, downloaded files must reproduce these
+hashes before the publication status is changed from `local_only`.
 
 ## Artifact availability and honest boundaries
 
 | Artifact | Current location | Publication status |
 | --- | --- | --- |
 | v1 demonstrations | Hugging Face repo ID above and Jetson cache | Dataset repo identified; accessibility should be checked before external release |
-| ACT 10/20/30 checkpoints | Jetson `outputs/train/` | Complete locally; Hub model publication pending |
-| Diffusion 30k checkpoint | Jetson `outputs/train/` | Complete locally; Hub model publication pending |
+| ACT 10/20/30 checkpoints | Jetson `outputs/train/`; hashes in `model_artifacts.csv` | Complete locally; Hub model publication pending |
+| Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |

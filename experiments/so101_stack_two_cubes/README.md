@@ -56,6 +56,10 @@ placement protocol was not yet standardized.
   training step, subset membership, and the matched ACT training contract.
 - [`act_training_runs.csv`](act_training_runs.csv): completed 10/20/30-episode
   matched-budget ACT runs, retained loss sources, and checkpoint verification.
+- [`inventory_model_artifacts.py`](inventory_model_artifacts.py): checks
+  completed training steps and hashes model weights plus training configs.
+- [`model_artifacts.csv`](model_artifacts.csv): Jetson-generated sizes and
+  SHA-256 identities for all completed ACT and Diffusion checkpoints.
 - [`results.csv`](results.csv): append-only experiment summary.
 - [`trials.csv`](trials.csv): one auditable row per physical evaluation trial.
 - [`check_start_pose.py`](check_start_pose.py): read-only validation of the
