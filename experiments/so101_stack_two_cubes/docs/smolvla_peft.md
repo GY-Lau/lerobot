@@ -101,7 +101,8 @@ declared vocabulary, or metadata counts disagree with the parquet data.
 ## 3. Run a resource smoke test before the long job
 
 Download the declared base-model revision into a stable local directory and
-verify its 907 MB weight file against the committed SHA-256 manifest:
+verify its 907 MB weight file plus the pinned SmolVLM2 config, tokenizer, and
+processor files against the committed SHA-256 manifest:
 
 ```bash
 bash experiments/so101_stack_two_cubes/scripts/prepare_smolvla_base.sh
@@ -111,8 +112,12 @@ The manifest pins `lerobot/smolvla_base` at revision
 `c83c3163b8ca9b7e67c509fffd9121e66cb96205`. The launcher uses the verified
 local snapshot at `/home/hai/models/lerobot_smolvla_base_c83c316`, so a later
 Hub update or a network outage cannot silently change the training
-initialization. Use `--dry-run` to inspect both the download and verification
-commands.
+initialization. SmolVLM2 processor/config files are pinned separately at
+`/home/hai/models/smolvlm2_500m_processor_7b375e1`. Training constructs the
+backbone architecture from those local files with `load_vlm_weights=false`,
+then restores the complete verified SmolVLA weights. This avoids a redundant
+2.03 GB backbone-weight download. Use `--dry-run` to inspect the downloads and
+verification command.
 
 The Jetson's configured Aliyun mirror did not expose `num2words`, so install
 the two missing packages from the official PyPI index:

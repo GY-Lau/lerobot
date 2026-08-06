@@ -62,6 +62,7 @@ accelerate_bin="${ACCELERATE_BIN:-$(dirname -- "$python_bin")/accelerate}"
 dataset_repo="${LANGUAGE_DATASET_REPO:-GY-William/lerobot_stack_two_orders_language_v2}"
 dataset_root="${LANGUAGE_DATASET_ROOT:-${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}/$dataset_repo}"
 base_model="${SMOLVLA_BASE_MODEL:-/home/hai/models/lerobot_smolvla_base_c83c316}"
+backbone_model="${SMOLVLA_BACKBONE_MODEL:-/home/hai/models/smolvlm2_500m_processor_7b375e1}"
 base_manifest="${SMOLVLA_BASE_MANIFEST:-$experiment_dir/manifests/smolvla_base.json}"
 output_dir="$repo_root/outputs/train/$run_name"
 warmup_steps=$(( steps < 500 ? steps / 10 : 500 ))
@@ -79,7 +80,8 @@ train_cmd=(
   --policy.output_features=null
   --policy.device=cuda
   --policy.push_to_hub=false
-  --policy.load_vlm_weights=true
+  "--policy.vlm_model_name=$backbone_model"
+  --policy.load_vlm_weights=false
   --policy.optimizer_lr=1e-3
   --policy.scheduler_decay_lr=1e-4
   "--policy.scheduler_warmup_steps=$warmup_steps"
@@ -104,7 +106,7 @@ if "$dry_run"; then
   printf 'base-model gate:\n  '
   printf '%q ' \
     "$python_bin" "$script_dir/verify_smolvla_base.py" \
-    "--root=$base_model" "--manifest=$base_manifest"
+    "--root=$base_model" "--backbone-root=$backbone_model" "--manifest=$base_manifest"
   printf '\n\ndataset gate:\n  %q %q %q %q %q\n\ntraining command:\n  ' \
     "$python_bin" "$script_dir/validate_language_dataset.py" "$dataset_root" \
     --min-tasks=2 --min-episodes-per-task=30
@@ -120,6 +122,9 @@ for required_path in \
   "$base_manifest" \
   "$base_model/config.json" \
   "$base_model/model.safetensors" \
+  "$backbone_model/config.json" \
+  "$backbone_model/tokenizer.json" \
+  "$backbone_model/preprocessor_config.json" \
   "$dataset_root/meta/info.json"; do
   if [[ ! -e "$required_path" ]]; then
     echo "Required path does not exist: $required_path" >&2
@@ -128,6 +133,7 @@ for required_path in \
 done
 "$python_bin" "$script_dir/verify_smolvla_base.py" \
   "--root=$base_model" \
+  "--backbone-root=$backbone_model" \
   "--manifest=$base_manifest"
 if ! "$python_bin" -c 'import num2words, peft' >/dev/null 2>&1; then
   echo 'Missing SmolVLA/PEFT dependencies. Install the validated versions with:' >&2

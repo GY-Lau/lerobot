@@ -136,8 +136,9 @@ remain under the repository-level `outputs/` directory.
 - [`prepare_language_dataset.sh`](scripts/prepare_language_dataset.sh): guarded copy
   of the committed ACT v2 30-episode subset and merge with the inverse color order
   into one balanced multi-task dataset.
-- [`smolvla_base.json`](manifests/smolvla_base.json): immutable base-model revision,
-  required-file list, source URL, and expected weight SHA-256.
+- [`smolvla_base.json`](manifests/smolvla_base.json): immutable SmolVLA and
+  SmolVLM2 processor/config revisions, required-file lists, source URLs, and
+  expected SHA-256 identities.
 - [`prepare_smolvla_base.sh`](scripts/prepare_smolvla_base.sh): resumable pinned
   snapshot download through the configured Hugging Face endpoint.
 - [`verify_smolvla_base.py`](scripts/verify_smolvla_base.py): rejects missing,

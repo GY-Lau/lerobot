@@ -18,6 +18,7 @@ python_bin="${LEROBOT_PYTHON:-/home/hai/miniconda3/envs/lerobot/bin/python}"
 hf_bin="${HF_CLI:-/home/hai/.local/bin/hf}"
 manifest="${SMOLVLA_BASE_MANIFEST:-$experiment_dir/manifests/smolvla_base.json}"
 local_dir="${SMOLVLA_BASE_MODEL:-/home/hai/models/lerobot_smolvla_base_c83c316}"
+backbone_dir="${SMOLVLA_BACKBONE_MODEL:-/home/hai/models/smolvlm2_500m_processor_7b375e1}"
 endpoint="${HF_ENDPOINT:-https://hf-mirror.com}"
 
 if [[ ! -f "$manifest" ]]; then
@@ -37,6 +38,18 @@ for filename in manifest["required_files"]:
 repo_id="${manifest_values[0]}"
 revision="${manifest_values[1]}"
 files=("${manifest_values[@]:2}")
+mapfile -t backbone_values < <("$python_bin" -c '
+import json
+import sys
+backbone = json.load(open(sys.argv[1], encoding="utf-8"))["backbone"]
+print(backbone["repo_id"])
+print(backbone["revision"])
+for filename in backbone["required_files"]:
+    print(filename)
+' "$manifest")
+backbone_repo_id="${backbone_values[0]}"
+backbone_revision="${backbone_values[1]}"
+backbone_files=("${backbone_values[@]:2}")
 
 download_cmd=(
   /usr/bin/env "HF_ENDPOINT=$endpoint"
@@ -46,15 +59,26 @@ download_cmd=(
   "--local-dir=$local_dir"
   --max-workers=2
 )
+backbone_download_cmd=(
+  /usr/bin/env "HF_ENDPOINT=$endpoint"
+  "$hf_bin" download "$backbone_repo_id"
+  "${backbone_files[@]}"
+  "--revision=$backbone_revision"
+  "--local-dir=$backbone_dir"
+  --max-workers=2
+)
 verify_cmd=(
   "$python_bin" "$script_dir/verify_smolvla_base.py"
   "--root=$local_dir"
+  "--backbone-root=$backbone_dir"
   "--manifest=$manifest"
 )
 
 if "$dry_run"; then
   printf 'download command:\n  '
   printf '%q ' "${download_cmd[@]}"
+  printf '\n\nprocessor/config download command:\n  '
+  printf '%q ' "${backbone_download_cmd[@]}"
   printf '\n\nverification command:\n  '
   printf '%q ' "${verify_cmd[@]}"
   printf '\n'
@@ -68,6 +92,7 @@ for required_path in "$python_bin" "$hf_bin"; do
   fi
 done
 
-mkdir -p "$local_dir"
+mkdir -p "$local_dir" "$backbone_dir"
 "${download_cmd[@]}"
+"${backbone_download_cmd[@]}"
 "${verify_cmd[@]}"

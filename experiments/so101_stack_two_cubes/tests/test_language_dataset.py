@@ -144,6 +144,8 @@ class LanguageDatasetValidationTest(unittest.TestCase):
         self.assertIn("GY-William/lerobot_stack_two_orders_language_v2", result.stdout)
         self.assertIn("verify_smolvla_base.py", result.stdout)
         self.assertIn("lerobot_smolvla_base_c83c316", result.stdout)
+        self.assertIn("smolvlm2_500m_processor_7b375e1", result.stdout)
+        self.assertIn("--policy.load_vlm_weights=false", result.stdout)
 
 
 if __name__ == "__main__":
