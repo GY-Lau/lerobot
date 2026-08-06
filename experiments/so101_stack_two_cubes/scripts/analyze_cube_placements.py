@@ -23,6 +23,21 @@ class Detection:
     ambiguous: bool
 
 
+def has_implausible_size(detection: Detection, image_shape: tuple[int, ...]) -> bool:
+    """Reject color regions that are too large to be one cube in this image.
+
+    Use resolution-relative limits because a valid cube near the camera can be
+    wider than 200 pixels in a 640x480 image.
+    """
+    image_height, image_width = image_shape[:2]
+    _, _, bbox_width, bbox_height = detection.bbox
+    return (
+        bbox_width > image_width * 0.5
+        or bbox_height > image_height * 0.5
+        or detection.area_px > image_width * image_height * 0.15
+    )
+
+
 def _color_mask(image_rgb: np.ndarray, color: str) -> np.ndarray:
     hsv = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2HSV)
     if color == "red":
@@ -118,11 +133,10 @@ def _row(source: str | int, image_rgb: np.ndarray) -> dict[str, object]:
                 }
             )
         else:
-            _, _, bbox_width, bbox_height = detection.bbox
             quality_flags = []
             if detection.ambiguous:
                 quality_flags.append("ambiguous")
-            if bbox_width > 200 or bbox_height > 200 or detection.area_px > 30_000:
+            if has_implausible_size(detection, image_rgb.shape):
                 quality_flags.append("implausible_size")
             row.update(
                 {

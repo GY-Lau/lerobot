@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
-from analyze_cube_placements import detect_cube
+from analyze_cube_placements import Detection, detect_cube, has_implausible_size
 from summarize_latency import load_rows, percentile, summarize
 
 import numpy as np
@@ -28,6 +28,14 @@ class CubeDetectionTest(unittest.TestCase):
     def test_rejects_missing_cube(self):
         with self.assertRaisesRegex(ValueError, "No red component"):
             detect_cube(np.zeros((20, 20, 3), dtype=np.uint8), "red", min_area_px=10)
+
+    def test_accepts_large_nearby_cube_at_640_by_480(self):
+        detection = Detection(0, 0, 0, 0, 30_094, (216, 278, 226, 202), False)
+        self.assertFalse(has_implausible_size(detection, (480, 640, 3)))
+
+    def test_rejects_component_covering_most_of_image(self):
+        detection = Detection(0, 0, 0, 0, 80_000, (10, 10, 400, 300), False)
+        self.assertTrue(has_implausible_size(detection, (480, 640, 3)))
 
 
 class LatencySummaryTest(unittest.TestCase):
