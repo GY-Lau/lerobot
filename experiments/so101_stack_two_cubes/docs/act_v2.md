@@ -78,13 +78,15 @@ sizes, training contracts, and SHA-256 identities:
 bash experiments/so101_stack_two_cubes/scripts/train_act_v2_sequence.sh
 ```
 
-The current retained execution is split across machines: v2-30 runs on the
-Jetson and v2-50 runs in an isolated RTX A4500 workspace. The dataset manifest,
-30,000 updates, batch size, seed, AMP setting, and policy configuration remain
-matched. This avoids rerunning v2-50 on the slower Jetson, but machine and
-software provenance must be retained and the result must not be presented as a
-strict same-hardware training comparison. Both policies are evaluated on the
-same Jetson robot setup.
+The retained execution was split across machines: v2-30 completed on the
+Jetson in 4:14:51, and v2-50 completed in an isolated RTX A4500 workspace in
+0:39:53. Both final checkpoints passed the contract verifier. The v2-50 final
+checkpoint was copied to the Jetson, where its model and training-config hashes
+matched the A4500 originals and the verifier passed again. The dataset
+manifest, 30,000 updates, batch size, seed, AMP setting, and policy
+configuration are matched. This avoids rerunning v2-50 on the slower Jetson,
+but the result must not be presented as a strict same-hardware training
+comparison. Both policies are evaluated on the same Jetson robot setup.
 
 For manual execution or rerunning just one side of the comparison, use:
 

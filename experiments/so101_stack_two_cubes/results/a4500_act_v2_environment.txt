@@ -41,7 +41,19 @@ training_contract
   use_amp: false
   num_workers: 0
 
+result
+  status: PASS
+  wall_time: 00:39:53
+  mean_training_rate_steps_per_s: 12.54
+  final_logged_loss: 0.164
+  model_size_bytes: 206699736
+  model_sha256: a6f50602978974a3e7b8bd467eae2d81416c4c6ef481d8e0513ebae2e1b6b520
+  train_config_sha256: 73c7fc763ea07500401038580332c02554ca33db532ea2aa9c4f34465cef7876
+  checkpoint_contract: PASS on A4500 and after transfer to Jetson
+
 notes
   The second A4500 was not used because it had an unrelated process.
   No unrelated process, service, environment, or file was modified.
   This file records the A4500 v2-50 run only; v2-30 was trained on Jetson.
+  Only checkpoint 030000 was copied to Jetson. Both recorded SHA-256 values
+  matched after transfer, and the Jetson-side contract verifier passed.

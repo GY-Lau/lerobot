@@ -2,3 +2,5 @@ run_id,unique_episodes,optimizer_steps,batch_size,sampled_frames,seed,use_amp,fi
 act_stack_two_cubes_10ep_30k,10,30000,2,60000,1000,false,0.123,systemd_journal_lerobot-act-10ep-30k,04:26:39,PASS,"Completed 2026-08-05; deterministic subset manifest"
 act_stack_two_cubes_20ep_30k,20,30000,2,60000,1000,false,0.153,systemd_journal_lerobot-act-20ep-after-10,04:29:55,PASS,"Completed 2026-08-05; deterministic subset manifest"
 act_stack_two_cubes_30k,30,30000,2,60000,1000,false,0.173,original_interactive_training_log,not_recorded,PASS,"Authoritative original baseline; dataset.episodes=null means all 30 episodes"
+act_stack_two_cubes_v2_30ep_30k,30,30000,2,60000,1000,false,0.153,systemd_log_lerobot-train-act-v2-30,04:14:51,PASS,"Completed 2026-08-06 on Jetson; deterministic spatial-coverage v2 subset"
+act_stack_two_cubes_v2_50ep_30k,50,30000,2,60000,1000,false,0.164,a4500_training_log,00:39:53,PASS,"Completed 2026-08-06 on RTX A4500 GPU0; copied to Jetson with matching SHA-256"
