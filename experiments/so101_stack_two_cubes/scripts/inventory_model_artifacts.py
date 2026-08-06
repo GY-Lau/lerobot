@@ -23,6 +23,8 @@ ARTIFACTS = (
     ArtifactSpec("act_20ep_30k", "act_stack_two_cubes_20ep_30k", 20),
     ArtifactSpec("act_30ep_30k", "act_stack_two_cubes_30k", 30),
     ArtifactSpec("diffusion_30ep_30k", "diffusion_stack_two_cubes_30k", 30),
+    ArtifactSpec("act_v2_30ep_30k", "act_stack_two_cubes_v2_30ep_30k", 30),
+    ArtifactSpec("act_v2_50ep_30k", "act_stack_two_cubes_v2_50ep_30k", 50),
 )
 FIELDNAMES = (
     "artifact_id",

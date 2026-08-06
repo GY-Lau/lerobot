@@ -74,9 +74,13 @@ if "$dry_run"; then
       --manifest "$manifest" --episode-count "$episode_count"
     printf '\n\n'
   done
+  printf 'artifact inventory command:\n  '
+  printf '%q ' "$python_bin" "$script_dir/inventory_model_artifacts.py"
+  printf '\n'
   exit 0
 fi
 
 run_or_verify 30 "$run_30"
 run_or_verify 50 "$run_50"
+"$python_bin" "$script_dir/inventory_model_artifacts.py"
 echo "ACT v2 sequential 30/50 training and verification: PASS"

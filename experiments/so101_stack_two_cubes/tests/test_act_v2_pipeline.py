@@ -91,6 +91,8 @@ class ActV2PipelineTest(unittest.TestCase):
             self.assertEqual(result.stdout.count("verification command:"), 2)
             self.assertIn("--episode-count 30", result.stdout)
             self.assertIn("--episode-count 50", result.stdout)
+            self.assertIn("artifact inventory command:", result.stdout)
+            self.assertIn("inventory_model_artifacts.py", result.stdout)
 
 
 if __name__ == "__main__":

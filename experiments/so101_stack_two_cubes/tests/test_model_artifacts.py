@@ -8,10 +8,15 @@ import unittest
 from pathlib import Path
 
 import _bootstrap  # noqa: F401
-from inventory_model_artifacts import ArtifactSpec, collect_artifact, write_inventory
+from inventory_model_artifacts import ARTIFACTS, ArtifactSpec, collect_artifact, write_inventory
 
 
 class ModelArtifactInventoryTest(unittest.TestCase):
+    def test_inventory_declares_both_act_v2_comparisons(self):
+        by_id = {spec.artifact_id: spec for spec in ARTIFACTS}
+        self.assertEqual(by_id["act_v2_30ep_30k"].unique_episodes, 30)
+        self.assertEqual(by_id["act_v2_50ep_30k"].unique_episodes, 50)
+
     def make_artifact(self, root: Path, *, saved_step: int = 30_000) -> ArtifactSpec:
         spec = ArtifactSpec("test_act", "test_run", 7)
         checkpoint = root / "outputs/train/test_run/checkpoints/030000"
