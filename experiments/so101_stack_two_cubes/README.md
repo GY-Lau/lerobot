@@ -63,6 +63,9 @@ remain under the repository-level `outputs/` directory.
   episode ACT ablation and matched-budget interpretation rules.
 - [`act_v2.md`](docs/act_v2.md): independent clean 50-episode collection, nested
   30/50 subset audit, and matched ACT improvement protocol.
+- [`a4500_act_v2_environment.txt`](results/a4500_act_v2_environment.txt): exact
+  source, package, GPU, dataset, and training provenance for the isolated
+  A4500 v2-50 run.
 - [`training_start_positions.csv`](manifests/training_start_positions.csv): per-episode
   marker-free cube detections used to construct the ACT subsets.
 - [`act_data_subsets.json`](manifests/act_data_subsets.json): deterministic nested episode
