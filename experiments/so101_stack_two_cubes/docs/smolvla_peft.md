@@ -117,7 +117,8 @@ initialization. SmolVLM2 processor/config files are pinned separately at
 backbone architecture from those local files with `load_vlm_weights=false`,
 then restores the complete verified SmolVLA weights. This avoids a redundant
 2.03 GB backbone-weight download. Use `--dry-run` to inspect the downloads and
-verification command.
+verification command. Interrupted mirror transfers retain their partial file;
+the preparation script retries up to 10 times instead of restarting from zero.
 
 The Jetson's configured Aliyun mirror did not expose `num2words`, so install
 the two missing packages from the official PyPI index:

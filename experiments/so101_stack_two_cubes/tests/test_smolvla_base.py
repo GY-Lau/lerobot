@@ -89,6 +89,19 @@ class SmolVlaBaseTest(unittest.TestCase):
             self.assertIn("processor/config download command", result.stdout)
             self.assertIn("verify_smolvla_base.py", result.stdout)
 
+    def test_prepare_rejects_invalid_retry_count(self):
+        env = os.environ.copy()
+        env["SMOLVLA_DOWNLOAD_ATTEMPTS"] = "0"
+        result = subprocess.run(
+            ["bash", str(PREPARE), "--dry-run"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("positive integer", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

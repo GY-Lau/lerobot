@@ -182,7 +182,7 @@ Run the experiment-level tests on the Jetson environment:
   -s experiments/so101_stack_two_cubes/tests -p 'test_*.py'
 ```
 
-The current suite has 82 passing tests, covering directory layout and links,
+The current suite has 83 passing tests, covering directory layout and links,
 trial logging, summaries,
 placement analysis, subset construction, language-dataset and cross-task
 position-balance validation,

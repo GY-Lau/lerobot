@@ -20,6 +20,11 @@ manifest="${SMOLVLA_BASE_MANIFEST:-$experiment_dir/manifests/smolvla_base.json}"
 local_dir="${SMOLVLA_BASE_MODEL:-/home/hai/models/lerobot_smolvla_base_c83c316}"
 backbone_dir="${SMOLVLA_BACKBONE_MODEL:-/home/hai/models/smolvlm2_500m_processor_7b375e1}"
 endpoint="${HF_ENDPOINT:-https://hf-mirror.com}"
+download_attempts="${SMOLVLA_DOWNLOAD_ATTEMPTS:-10}"
+if [[ ! "$download_attempts" =~ ^[1-9][0-9]*$ ]]; then
+  echo "SMOLVLA_DOWNLOAD_ATTEMPTS must be a positive integer." >&2
+  exit 2
+fi
 
 if [[ ! -f "$manifest" ]]; then
   echo "SmolVLA base manifest does not exist: $manifest" >&2
@@ -92,7 +97,25 @@ for required_path in "$python_bin" "$hf_bin"; do
   fi
 done
 
+run_with_retries() {
+  local label="$1"
+  shift
+  local attempt
+  for ((attempt = 1; attempt <= download_attempts; attempt++)); do
+    echo "$label download attempt $attempt/$download_attempts"
+    if "$@"; then
+      return 0
+    fi
+    if (( attempt < download_attempts )); then
+      echo "$label download interrupted; retrying the retained partial download in 10 seconds." >&2
+      sleep 10
+    fi
+  done
+  echo "$label download failed after $download_attempts attempts." >&2
+  return 1
+}
+
 mkdir -p "$local_dir" "$backbone_dir"
-"${download_cmd[@]}"
-"${backbone_download_cmd[@]}"
+run_with_retries "SmolVLA base" "${download_cmd[@]}"
+run_with_retries "SmolVLM2 processor/config" "${backbone_download_cmd[@]}"
 "${verify_cmd[@]}"
