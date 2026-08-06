@@ -141,6 +141,8 @@ class LanguageDatasetValidationTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("GY-William/lerobot_stack_two_orders_language_v2", result.stdout)
+        self.assertIn("verify_smolvla_base.py", result.stdout)
+        self.assertIn("lerobot_smolvla_base_c83c316", result.stdout)
 
 
 if __name__ == "__main__":

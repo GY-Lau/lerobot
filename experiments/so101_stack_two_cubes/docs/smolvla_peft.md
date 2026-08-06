@@ -84,6 +84,20 @@ counts disagree with the parquet data.
 
 ## 3. Run a resource smoke test before the long job
 
+Download the declared base-model revision into a stable local directory and
+verify its 907 MB weight file against the committed SHA-256 manifest:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/prepare_smolvla_base.sh
+```
+
+The manifest pins `lerobot/smolvla_base` at revision
+`c83c3163b8ca9b7e67c509fffd9121e66cb96205`. The launcher uses the verified
+local snapshot at `/home/hai/models/lerobot_smolvla_base_c83c316`, so a later
+Hub update or a network outage cannot silently change the training
+initialization. Use `--dry-run` to inspect both the download and verification
+commands.
+
 The Jetson's configured Aliyun mirror did not expose `num2words`, so install
 the two missing packages from the official PyPI index:
 
@@ -118,8 +132,8 @@ bash experiments/so101_stack_two_cubes/scripts/train_smolvla_peft.sh \
   smolvla_lora_r16_two_orders_20k 20000 1 16 5000 bf16
 ```
 
-The script starts from `lerobot/smolvla_base`, infers the SO-101 feature shapes
-from the merged dataset, applies LoRA to SmolVLA's default language-expert and
+The script starts from the pinned local `lerobot/smolvla_base` snapshot, infers
+the SO-101 feature shapes from the merged dataset, applies LoRA to SmolVLA's default language-expert and
 state/action projection targets, uses rank 16, and prevents accidental output
 overwrites. Mixed precision is controlled explicitly through Accelerate.
 

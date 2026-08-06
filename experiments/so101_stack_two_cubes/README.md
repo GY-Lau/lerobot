@@ -131,6 +131,12 @@ remain under the repository-level `outputs/` directory.
 - [`prepare_language_dataset.sh`](scripts/prepare_language_dataset.sh): guarded copy
   of the committed ACT v2 30-episode subset and merge with the inverse color order
   into one balanced multi-task dataset.
+- [`smolvla_base.json`](manifests/smolvla_base.json): immutable base-model revision,
+  required-file list, source URL, and expected weight SHA-256.
+- [`prepare_smolvla_base.sh`](scripts/prepare_smolvla_base.sh): resumable pinned
+  snapshot download through the configured Hugging Face endpoint.
+- [`verify_smolvla_base.py`](scripts/verify_smolvla_base.py): rejects missing,
+  empty, or hash-mismatched base-model snapshots before PEFT training.
 - [`validate_language_dataset.py`](scripts/validate_language_dataset.py): verifies
   task vocabulary, per-task episode balance, and label integrity.
 - [`train_smolvla_peft.sh`](scripts/train_smolvla_peft.sh): guarded SmolVLA LoRA smoke

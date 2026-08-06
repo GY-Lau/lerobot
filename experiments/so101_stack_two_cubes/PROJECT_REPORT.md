@@ -37,7 +37,7 @@ not silently cleaned after training.
 | ACT v2 curation | 50 retained episodes; manual video review; 50/50 clean red and yellow start detections; deterministic nested 30/50 manifest | Collection and audit complete; matched sequential training active | Verify both final checkpoints, then run paired physical evaluation |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
-| SmolVLA PEFT | Two-task protocol, merge validator, LoRA launcher, and isolated Jetson environment check | Infrastructure ready | Record 30 real inverse-task demonstrations, then smoke test and train |
+| SmolVLA PEFT | Two-task protocol, pinned base manifest/validator, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record 30 real inverse-task demonstrations, then smoke test and train |
 | Voice control | Text-first evaluation matrix and ASR error-separation design | Designed only | Requires a language-grounded model that first passes typed prompts |
 
 ## ACT data-efficiency experiment
@@ -180,10 +180,11 @@ Run the experiment-level tests on the Jetson environment:
   -s experiments/so101_stack_two_cubes/tests -p 'test_*.py'
 ```
 
-The current suite has 60 passing tests, covering directory layout and links,
+The current suite has 78 passing tests, covering directory layout and links,
 trial logging, summaries,
 placement analysis, subset construction, language-dataset validation,
-checkpoint contracts, model-to-evaluation-run mapping, and artifact hashing.
+checkpoint contracts, pinned SmolVLA base verification,
+model-to-evaluation-run mapping, and artifact hashing.
 
 Every completed model weight file and its training configuration have been
 hashed directly on the Jetson. The exact values are in

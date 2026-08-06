@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+dry_run=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+  dry_run=true
+  shift
+fi
+if [[ $# -ne 0 ]]; then
+  echo "Usage: prepare_smolvla_base.sh [--dry-run]" >&2
+  exit 2
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+experiment_dir="$(cd -- "$script_dir/.." && pwd)"
+python_bin="${LEROBOT_PYTHON:-/home/hai/miniconda3/envs/lerobot/bin/python}"
+hf_bin="${HF_CLI:-/home/hai/.local/bin/hf}"
+manifest="${SMOLVLA_BASE_MANIFEST:-$experiment_dir/manifests/smolvla_base.json}"
+local_dir="${SMOLVLA_BASE_MODEL:-/home/hai/models/lerobot_smolvla_base_c83c316}"
+endpoint="${HF_ENDPOINT:-https://hf-mirror.com}"
+
+if [[ ! -f "$manifest" ]]; then
+  echo "SmolVLA base manifest does not exist: $manifest" >&2
+  exit 1
+fi
+
+mapfile -t manifest_values < <("$python_bin" -c '
+import json
+import sys
+manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+print(manifest["repo_id"])
+print(manifest["revision"])
+for filename in manifest["required_files"]:
+    print(filename)
+' "$manifest")
+repo_id="${manifest_values[0]}"
+revision="${manifest_values[1]}"
+files=("${manifest_values[@]:2}")
+
+download_cmd=(
+  /usr/bin/env "HF_ENDPOINT=$endpoint"
+  "$hf_bin" download "$repo_id"
+  "${files[@]}"
+  "--revision=$revision"
+  "--local-dir=$local_dir"
+  --max-workers=2
+)
+verify_cmd=(
+  "$python_bin" "$script_dir/verify_smolvla_base.py"
+  "--root=$local_dir"
+  "--manifest=$manifest"
+)
+
+if "$dry_run"; then
+  printf 'download command:\n  '
+  printf '%q ' "${download_cmd[@]}"
+  printf '\n\nverification command:\n  '
+  printf '%q ' "${verify_cmd[@]}"
+  printf '\n'
+  exit 0
+fi
+
+for required_path in "$python_bin" "$hf_bin"; do
+  if [[ ! -x "$required_path" ]]; then
+    echo "Required executable does not exist: $required_path" >&2
+    exit 1
+  fi
+done
+
+mkdir -p "$local_dir"
+"${download_cmd[@]}"
+"${verify_cmd[@]}"

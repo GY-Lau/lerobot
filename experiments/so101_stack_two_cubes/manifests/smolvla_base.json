@@ -1,0 +1,16 @@
+{
+  "repo_id": "lerobot/smolvla_base",
+  "revision": "c83c3163b8ca9b7e67c509fffd9121e66cb96205",
+  "source_url": "https://huggingface.co/lerobot/smolvla_base/tree/c83c3163b8ca9b7e67c509fffd9121e66cb96205",
+  "required_files": [
+    "config.json",
+    "model.safetensors",
+    "policy_postprocessor.json",
+    "policy_postprocessor_step_0_unnormalizer_processor.safetensors",
+    "policy_preprocessor.json",
+    "policy_preprocessor_step_5_normalizer_processor.safetensors"
+  ],
+  "sha256": {
+    "model.safetensors": "7cd549ac2351fb069c0ddb3c34ad2d09cfc92b56a15dccdfc2e41467aaca01eb"
+  }
+}

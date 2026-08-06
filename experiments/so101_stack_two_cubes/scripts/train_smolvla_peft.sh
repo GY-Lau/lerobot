@@ -61,7 +61,8 @@ train_bin="${LEROBOT_TRAIN_BIN:-$(dirname -- "$python_bin")/lerobot-train}"
 accelerate_bin="${ACCELERATE_BIN:-$(dirname -- "$python_bin")/accelerate}"
 dataset_repo="${LANGUAGE_DATASET_REPO:-GY-William/lerobot_stack_two_orders_language_v2}"
 dataset_root="${LANGUAGE_DATASET_ROOT:-${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}/$dataset_repo}"
-base_model="${SMOLVLA_BASE_MODEL:-lerobot/smolvla_base}"
+base_model="${SMOLVLA_BASE_MODEL:-/home/hai/models/lerobot_smolvla_base_c83c316}"
+base_manifest="${SMOLVLA_BASE_MANIFEST:-$experiment_dir/manifests/smolvla_base.json}"
 output_dir="$repo_root/outputs/train/$run_name"
 warmup_steps=$(( steps < 500 ? steps / 10 : 500 ))
 if (( warmup_steps < 1 )); then warmup_steps=1; fi
@@ -100,7 +101,11 @@ train_cmd=(
 )
 
 if "$dry_run"; then
-  printf 'dataset gate:\n  %q %q %q %q %q\n\ntraining command:\n  ' \
+  printf 'base-model gate:\n  '
+  printf '%q ' \
+    "$python_bin" "$script_dir/verify_smolvla_base.py" \
+    "--root=$base_model" "--manifest=$base_manifest"
+  printf '\n\ndataset gate:\n  %q %q %q %q %q\n\ntraining command:\n  ' \
     "$python_bin" "$script_dir/validate_language_dataset.py" "$dataset_root" \
     --min-tasks=2 --min-episodes-per-task=30
   printf '%q ' "${train_cmd[@]}"
@@ -108,12 +113,22 @@ if "$dry_run"; then
   exit 0
 fi
 
-for required_path in "$python_bin" "$train_bin" "$accelerate_bin" "$dataset_root/meta/info.json"; do
+for required_path in \
+  "$python_bin" \
+  "$train_bin" \
+  "$accelerate_bin" \
+  "$base_manifest" \
+  "$base_model/config.json" \
+  "$base_model/model.safetensors" \
+  "$dataset_root/meta/info.json"; do
   if [[ ! -e "$required_path" ]]; then
     echo "Required path does not exist: $required_path" >&2
     exit 1
   fi
 done
+"$python_bin" "$script_dir/verify_smolvla_base.py" \
+  "--root=$base_model" \
+  "--manifest=$base_manifest"
 if ! "$python_bin" -c 'import num2words, peft' >/dev/null 2>&1; then
   echo 'Missing SmolVLA/PEFT dependencies. Install the validated versions with:' >&2
   echo '  python -m pip install --index-url https://pypi.org/simple num2words==0.5.14 peft==0.20.0' >&2
