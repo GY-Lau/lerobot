@@ -24,6 +24,8 @@ first_root="${ACT_V2_DATASET_ROOT:-$dataset_base/$first_repo}"
 second_root="${INVERSE_DATASET_ROOT:-$dataset_base/$second_repo}"
 merged_root="${LANGUAGE_DATASET_ROOT:-$dataset_base/$merged_repo}"
 manifest="${ACT_V2_MANIFEST:-$experiment_dir/manifests/act_v2_subsets.json}"
+act_v2_positions="${ACT_V2_POSITIONS_CSV:-$experiment_dir/manifests/act_v2_start_positions.csv}"
+inverse_positions="${INVERSE_POSITIONS_CSV:-$experiment_dir/manifests/inverse_language_start_positions.csv}"
 subset_name="language30"
 subset_repo="${first_repo}_${subset_name}"
 subset_parent="${LANGUAGE_SUBSET_PARENT:-${first_root}_language_build}"
@@ -65,6 +67,10 @@ split_cmd=(
   "--new_root=$subset_parent"
   --push_to_hub=false
 )
+balance_cmd=(
+  "$python_bin" "$script_dir/validate_language_position_balance.py"
+  "$act_v2_positions" "$manifest" "$inverse_positions"
+)
 
 merge_cmd=(
   "$edit_bin"
@@ -86,7 +92,9 @@ validate_cmd=(
 
 if "$dry_run"; then
   printf 'ACT v2 subset episodes (30): %s\n\n' "$episodes_json"
-  printf 'split command:\n  '
+  printf 'cross-task role-aligned balance gate:\n  '
+  printf '%q ' "${balance_cmd[@]}"
+  printf '\n\nsplit command:\n  '
   printf '%q ' "${split_cmd[@]}"
   printf '\n\nmerge command:\n  '
   printf '%q ' "${merge_cmd[@]}"
@@ -96,7 +104,12 @@ if "$dry_run"; then
   exit 0
 fi
 
-for required_path in "$edit_bin" "$first_root/meta/info.json" "$second_root/meta/info.json"; do
+for required_path in \
+  "$edit_bin" \
+  "$first_root/meta/info.json" \
+  "$second_root/meta/info.json" \
+  "$act_v2_positions" \
+  "$inverse_positions"; do
   if [[ ! -e "$required_path" ]]; then
     echo "Required path does not exist: $required_path" >&2
     exit 1
@@ -111,6 +124,7 @@ if [[ -e "$merged_root" ]]; then
   exit 1
 fi
 
+"${balance_cmd[@]}"
 "${split_cmd[@]}"
 "${merge_cmd[@]}"
 "${validate_cmd[@]}"

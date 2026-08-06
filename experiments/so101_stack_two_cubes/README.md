@@ -114,6 +114,11 @@ remain under the repository-level `outputs/` directory.
   it stops at the declared 30-episode target.
 - [`record_inverse_language_session.py`](scripts/record_inverse_language_session.py):
   persistent keep/discard recording loop for the inverse language behavior.
+- [`prepare_inverse_language_audit.sh`](scripts/prepare_inverse_language_audit.sh):
+  extracts all inverse-task start frames and applies visual-quality and
+  cross-task role-aligned placement gates.
+- [`validate_language_position_balance.py`](scripts/validate_language_position_balance.py):
+  detects gross task-label/layout confounding using median shift and p10--p90 overlap.
 - [`discard_last_dataset_episode.sh`](scripts/discard_last_dataset_episode.sh): guarded,
   repository-parameterized last-episode removal with retained source backups.
 - [`record_act_v2_data.sh`](scripts/record_act_v2_data.sh): progress-aware recorder for

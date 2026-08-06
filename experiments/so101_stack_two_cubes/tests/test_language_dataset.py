@@ -104,6 +104,7 @@ class LanguageDatasetValidationTest(unittest.TestCase):
             self.assertIn("lerobot_stack_two_cubes_v2_language30", result.stdout)
             self.assertIn("lerobot_stack_red_on_yellow", result.stdout)
             self.assertIn("lerobot_stack_two_orders_language_v2", result.stdout)
+            self.assertIn("validate_language_position_balance.py", result.stdout)
 
     def test_prepare_rejects_manifest_for_another_dataset(self):
         with tempfile.TemporaryDirectory() as tmp:

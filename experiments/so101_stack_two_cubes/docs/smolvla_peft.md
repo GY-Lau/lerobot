@@ -55,6 +55,21 @@ Repeat until 30 successful demonstrations have been retained. Failed or
 interrupted demonstrations should not silently remain in the training set.
 The recorder reports the current count and refuses to create episode 31.
 
+After reviewing all 30 trajectories, audit every first frame and compare the
+two tasks' role-aligned position distributions:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/prepare_inverse_language_audit.sh
+```
+
+The moving yellow cube in the original task is compared with the moving red
+cube in the inverse task; likewise, the two base-cube distributions are
+compared. Every color detection must be clean. For each role and image axis,
+the median shift must be at most 0.12 normalized image units and the narrower
+task's p10--p90 interval must overlap the other by at least 25%. This is a
+guard against gross layout leakage, not proof that language is the only usable
+signal; the paired physical prompt evaluation remains necessary.
+
 ## 2. Merge and validate the language dataset
 
 Preview the non-destructive merge command:
@@ -77,10 +92,11 @@ not modified. The output is:
 GY-William/lerobot_stack_two_orders_language_v2
 ```
 
-The merge preserves the original task index on every trajectory. The validator
-rejects a dataset when an episode contains multiple labels, a task has fewer
-than 30 episodes, task text differs from the declared vocabulary, or metadata
-counts disagree with the parquet data.
+Before copying or merging, the preparation script reruns the committed
+role-aligned position-balance gate. The merge preserves the original task index
+on every trajectory. The validator rejects a dataset when an episode contains
+multiple labels, a task has fewer than 30 episodes, task text differs from the
+declared vocabulary, or metadata counts disagree with the parquet data.
 
 ## 3. Run a resource smoke test before the long job
 
