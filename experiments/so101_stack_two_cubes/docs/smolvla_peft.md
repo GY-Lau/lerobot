@@ -2,20 +2,26 @@
 
 ## Evidence gate
 
-The current dataset was inspected directly on 2026-08-05:
+The yellow-on-red source dataset was inspected and curated directly on
+2026-08-06:
 
-- `GY-William/lerobot_stack_two_cubes`
-- 30 episodes, 17,970 frames, 30 FPS
+- `GY-William/lerobot_stack_two_cubes_v2`
+- 50 retained episodes, 29,914 frames, 30 FPS
 - exactly one task label: `Stack the yellow cube on top of the red cube`
 
-This dataset can support a single-task SmolVLA PEFT smoke test, but it cannot
-demonstrate language-conditioned task selection. Relabeling the same trajectory
-with paraphrases would teach multiple strings for the same action, not distinct
-language-controlled behaviors.
+The language experiment takes the committed, spatially balanced 30-episode
+subset from `manifests/act_v2_subsets.json`. This keeps the two behaviors at
+30 demonstrations each while using the manually reviewed v2 data rather than
+the noisier original ACT dataset. It also prevents data quality from becoming
+an accidental proxy for the requested color order.
+
+A single behavior still cannot demonstrate language-conditioned task selection.
+Relabeling the same trajectory with paraphrases would teach multiple strings for
+the same action, not distinct language-controlled behaviors.
 
 The reportable language experiment therefore uses two balanced behaviors:
 
-1. `Stack the yellow cube on top of the red cube` (existing 30 episodes).
+1. `Stack the yellow cube on top of the red cube` (audited v2 subset, 30 episodes).
 2. `Stack the red cube on top of the yellow cube` (30 new episodes).
 
 Keep camera, background, arm calibration, 30 FPS, 20-second horizon, and cube
@@ -63,10 +69,12 @@ After the second dataset is complete, create the balanced merged dataset:
 bash experiments/so101_stack_two_cubes/scripts/prepare_language_dataset.sh
 ```
 
-The output is:
+The preparation script first copies the exact committed v2 subset into a
+separate dataset and then merges it with the inverse task. Source datasets are
+not modified. The output is:
 
 ```text
-GY-William/lerobot_stack_two_orders_language
+GY-William/lerobot_stack_two_orders_language_v2
 ```
 
 The merge preserves the original task index on every trajectory. The validator

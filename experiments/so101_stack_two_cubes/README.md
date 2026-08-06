@@ -128,8 +128,9 @@ remain under the repository-level `outputs/` directory.
   audited 30- and 50-episode subsets.
 - [`train_act_v2_sequence.sh`](scripts/train_act_v2_sequence.sh): guarded sequential
   30/50 trainer that verifies each final checkpoint before continuing.
-- [`prepare_language_dataset.sh`](scripts/prepare_language_dataset.sh): guarded merge
-  of the two color orders into one balanced multi-task dataset.
+- [`prepare_language_dataset.sh`](scripts/prepare_language_dataset.sh): guarded copy
+  of the committed ACT v2 30-episode subset and merge with the inverse color order
+  into one balanced multi-task dataset.
 - [`validate_language_dataset.py`](scripts/validate_language_dataset.py): verifies
   task vocabulary, per-task episode balance, and label integrity.
 - [`train_smolvla_peft.sh`](scripts/train_smolvla_peft.sh): guarded SmolVLA LoRA smoke

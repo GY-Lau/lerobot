@@ -129,16 +129,19 @@ motion.
 
 ## SmolVLA language-control experiment
 
-The existing dataset has one instruction and one behavior. Relabeling the same
-trajectory with multiple prompts would test paraphrase invariance at most; it
-would not demonstrate language-controlled behavior selection. The declared
+The curated ACT v2 dataset has one instruction and one behavior. Relabeling the
+same trajectory with multiple prompts would test paraphrase invariance at most;
+it would not demonstrate language-controlled behavior selection. The declared
 experiment therefore requires two balanced, physically distinct tasks:
 
-1. Stack yellow on red: existing 30 demonstrations.
+1. Stack yellow on red: the committed, spatially balanced 30-episode subset of
+   the manually reviewed v2 dataset.
 2. Stack red on yellow: 30 new demonstrations under matched conditions.
 
-Only after the merged dataset passes exact vocabulary, episode-balance, and
-per-episode label-integrity checks will a rank-16 SmolVLA LoRA smoke test run.
+The merge pipeline copies the exact v2 subset before merging, so language order
+is not confounded with the lower-quality original 30-episode dataset. Only after
+the merged dataset passes exact vocabulary, episode-balance, and per-episode
+label-integrity checks will a rank-16 SmolVLA LoRA smoke test run.
 Typed exact and paraphrased prompts are evaluated before speech recognition is
 added. This isolates policy grounding errors from ASR errors.
 
