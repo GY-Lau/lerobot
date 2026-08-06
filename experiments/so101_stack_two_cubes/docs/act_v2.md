@@ -18,7 +18,19 @@ rewriting the v1 evidence.
 - Center the yellow cube over the red cube, lower it close to contact, release,
   and retract without disturbing the stack.
 
-Record and inspect progress one episode at a time:
+For a recording session, use the persistent recorder. It imports LeRobot once,
+then prompts before every episode and after every saved episode. Press Enter to
+record; after recording, press Enter/`k` to keep, `d` to discard, `q` to keep
+and quit, or `x` to discard and quit:
+
+```bash
+PYTHONNOUSERSITE=1 /home/hai/miniconda3/envs/lerobot/bin/python \
+  experiments/so101_stack_two_cubes/scripts/record_act_v2_session.py
+```
+
+The first startup still takes about 25--30 seconds on the Jetson. Later episodes
+reuse the loaded modules, although the arm and camera are safely reconnected for
+each episode. The original one-shot recorder remains available as a fallback:
 
 ```bash
 bash experiments/so101_stack_two_cubes/scripts/record_act_v2_data.sh --status

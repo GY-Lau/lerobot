@@ -112,6 +112,8 @@ remain under the repository-level `outputs/` directory.
   it stops at the declared 30-episode target.
 - [`record_act_v2_data.sh`](scripts/record_act_v2_data.sh): progress-aware recorder for
   the independent 50-episode, higher-quality yellow-on-red ACT v2 dataset.
+- [`record_act_v2_session.py`](scripts/record_act_v2_session.py): persistent interactive
+  ACT v2 recorder that pays LeRobot's import cost once per recording session.
 - [`discard_last_act_v2_episode.sh`](scripts/discard_last_act_v2_episode.sh): guarded
   removal of a failed final v2 demonstration with the original data retained.
 - [`prepare_act_v2_subsets.sh`](scripts/prepare_act_v2_subsets.sh): audits all 50 v2
