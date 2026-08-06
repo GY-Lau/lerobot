@@ -102,6 +102,26 @@ class SmolVlaBaseTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("positive integer", result.stderr)
 
+    def test_verified_snapshot_skips_network_client(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest, backbone_root = self.make_snapshot(root)
+            env = os.environ.copy()
+            env["LEROBOT_PYTHON"] = sys.executable
+            env["HF_CLI"] = "/bin/false"
+            env["SMOLVLA_BASE_MANIFEST"] = str(manifest)
+            env["SMOLVLA_BASE_MODEL"] = str(root)
+            env["SMOLVLA_BACKBONE_MODEL"] = str(backbone_root)
+            result = subprocess.run(
+                ["bash", str(PREPARE)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("skipping network downloads", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

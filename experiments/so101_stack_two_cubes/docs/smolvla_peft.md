@@ -119,6 +119,8 @@ then restores the complete verified SmolVLA weights. This avoids a redundant
 2.03 GB backbone-weight download. Use `--dry-run` to inspect the downloads and
 verification command. Interrupted mirror transfers retain their partial file;
 the preparation script retries up to 10 times instead of restarting from zero.
+If the files were copied from another machine, a successful hash check causes
+the script to skip all network access.
 
 The Jetson's configured Aliyun mirror did not expose `num2words`, so install
 the two missing packages from the official PyPI index:

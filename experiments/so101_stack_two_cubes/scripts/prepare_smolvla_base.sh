@@ -97,6 +97,12 @@ for required_path in "$python_bin" "$hf_bin"; do
   fi
 done
 
+if "${verify_cmd[@]}" >/dev/null 2>&1; then
+  "${verify_cmd[@]}"
+  echo "Pinned SmolVLA files are already complete; skipping network downloads."
+  exit 0
+fi
+
 run_with_retries() {
   local label="$1"
   shift
