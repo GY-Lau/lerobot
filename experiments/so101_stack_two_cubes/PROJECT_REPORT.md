@@ -34,7 +34,7 @@ not silently cleaned after training.
 | --- | --- | --- | --- |
 | ACT baseline | 30k-step checkpoint; exact config and files pass the checkpoint contract | Training complete; exploratory physical screen complete | Reportable physical evaluation if a precise rate estimate is needed |
 | ACT data efficiency | Deterministic nested 10/20/30 subsets; all three matched 30k-step checkpoints pass | Five-trial screen complete for every checkpoint | Larger paired sample before ranking checkpoints |
-| ACT v2 curation | 50 retained episodes; manual video review; 50/50 clean red and yellow start detections; deterministic nested 30/50 manifest | Collection and audit complete; matched sequential training active | Verify both final checkpoints, then run paired physical evaluation |
+| ACT v2 curation | 50 retained episodes; manual video review; 50/50 clean red and yellow start detections; deterministic nested 30/50 manifest | Collection and audit complete; v2-30 training on Jetson and v2-50 training on an RTX A4500 | Verify both final checkpoints, preserve environment provenance, then run paired physical evaluation |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA PEFT | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
@@ -104,6 +104,14 @@ holds the v1 contract fixed at 30,000 updates, batch size 2, AMP off, and seed
 
 Both comparisons remain hypotheses until their final checkpoints pass the
 contract verifier and complete the same physical evaluation protocol.
+
+The retained v2-30 run is being trained on the Jetson, while v2-50 is being
+trained on an RTX A4500 to avoid an unnecessary second long Jetson run. Both
+use the same dataset manifest and training contract, but this split-hardware
+execution is not a strict training-throughput comparison. Physical policy
+quality will still be evaluated on the same Jetson robot setup. A same-GPU
+replica would be required before attributing small differences solely to the
+number of demonstrations.
 
 ## ACT versus Diffusion on Jetson
 
@@ -214,7 +222,7 @@ hashes before the publication status is changed from `local_only`.
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
 | ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
 | ACT v2 demonstrations | Jetson cache; 50 episodes / 29,914 frames; committed position audit and subset manifest | Collection and audit complete; Hub publication pending |
-| ACT v2 checkpoints | Jetson `outputs/train/act_stack_two_cubes_v2_{30,50}ep_30k` | Sequential matched training in progress |
+| ACT v2 checkpoints | v2-30 on Jetson; v2-50 on the isolated A4500 workspace | Matched-config training in progress; no Jetson v2-50 rerun planned |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
