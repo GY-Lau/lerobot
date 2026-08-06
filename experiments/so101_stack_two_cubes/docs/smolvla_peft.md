@@ -136,6 +136,46 @@ A reportable first matrix has 10 trials in each cell (40 total):
 | red on yellow | exact | `Stack the red cube on top of the yellow cube` |
 | red on yellow | paraphrase | `Put the red block on the yellow block` |
 
+Run one 20-second trial with a condition key; repeat each key 10 times under the
+same paired physical starts:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/run_smolvla_language_trial.sh \
+  yellow_exact
+bash experiments/so101_stack_two_cubes/scripts/run_smolvla_language_trial.sh \
+  yellow_paraphrase
+bash experiments/so101_stack_two_cubes/scripts/run_smolvla_language_trial.sh \
+  red_exact
+bash experiments/so101_stack_two_cubes/scripts/run_smolvla_language_trial.sh \
+  red_paraphrase
+```
+
+The runner fixes the prompt, adapter checkpoint, evaluation dataset, 20-second
+horizon, camera settings, and latency log for each condition. Preview any command
+without loading the robot by inserting `--dry-run` before the condition.
+
+After reviewing the saved episode, log what stable behavior was actually visible:
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/log_smolvla_language_trial.py \
+  --condition yellow_exact \
+  --observed-behavior yellow_on_red \
+  --completion-time-s 14.2
+```
+
+If the model makes a stable stack in the opposite order, record it explicitly:
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/log_smolvla_language_trial.py \
+  --condition yellow_exact \
+  --observed-behavior red_on_yellow \
+  --failure-label wrong_color_order
+```
+
+The logger derives manipulation success and instruction-following success
+separately, rejects inconsistent outcome labels, and refuses to log a trial that
+does not have a corresponding recorded episode.
+
 Report both manipulation success and instruction-following accuracy. A stable
 stack in the opposite color order is a language-selection failure, not a task
 success.

@@ -135,6 +135,10 @@ remain under the repository-level `outputs/` directory.
   task vocabulary, per-task episode balance, and label integrity.
 - [`train_smolvla_peft.sh`](scripts/train_smolvla_peft.sh): guarded SmolVLA LoRA smoke
   test and full-training launcher.
+- [`run_smolvla_language_trial.sh`](scripts/run_smolvla_language_trial.sh): fixed
+  exact/paraphrase, two-order physical evaluation runner with latency logging.
+- [`log_smolvla_language_trial.py`](scripts/log_smolvla_language_trial.py): records
+  manipulation and instruction-following outcomes as separate audited metrics.
 - [`jetson_smolvla_environment.txt`](results/jetson_smolvla_environment.txt): validated
   JetPack, Python, CUDA/BF16, and PEFT package versions.
 - [`generate_trial_plan.py`](scripts/generate_trial_plan.py): deterministic placement

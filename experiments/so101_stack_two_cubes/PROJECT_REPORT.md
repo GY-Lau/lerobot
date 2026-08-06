@@ -143,7 +143,10 @@ is not confounded with the lower-quality original 30-episode dataset. Only after
 the merged dataset passes exact vocabulary, episode-balance, and per-episode
 label-integrity checks will a rank-16 SmolVLA LoRA smoke test run.
 Typed exact and paraphrased prompts are evaluated before speech recognition is
-added. This isolates policy grounding errors from ASR errors.
+added. A guarded four-condition runner and dedicated result logger are ready;
+the logger separates stable manipulation from instruction correctness, so an
+opposite-order stack cannot be reported as language-following success. This
+isolates policy grounding errors from ASR errors.
 
 ## Reproduce the verified parts
 
