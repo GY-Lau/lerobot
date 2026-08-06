@@ -94,6 +94,24 @@ train_cmd=(
   --wandb.enable=false
 )
 
+# Optional, explicit augmentation hook used by the robustness experiment. The
+# baseline path leaves this unset, so its serialized training contract remains
+# unchanged. Keep the full transform dictionary in one JSON value: partial map
+# overrides are easy to mis-serialize through draccus.
+if [[ -n "${ACT_V2_IMAGE_TRANSFORMS_JSON:-}" ]]; then
+  max_num_transforms="${ACT_V2_MAX_NUM_TRANSFORMS:-2}"
+  if [[ ! "$max_num_transforms" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ACT_V2_MAX_NUM_TRANSFORMS must be a positive integer." >&2
+    exit 2
+  fi
+  train_cmd+=(
+    --dataset.image_transforms.enable=true
+    "--dataset.image_transforms.max_num_transforms=$max_num_transforms"
+    --dataset.image_transforms.random_order=false
+    "--dataset.image_transforms.tfs=$ACT_V2_IMAGE_TRANSFORMS_JSON"
+  )
+fi
+
 if "$dry_run"; then
   printf 'quality gate:\n  %q %q %q %q\n\nmanifest gate:\n  ' \
     "$python_bin" "$script_dir/validate_act_v2_positions.py" "$positions_csv" --expected-episodes=50

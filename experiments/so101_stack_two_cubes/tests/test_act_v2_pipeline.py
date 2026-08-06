@@ -12,6 +12,7 @@ from _bootstrap import SCRIPTS_DIR
 
 PREPARE = SCRIPTS_DIR / "prepare_act_v2_subsets.sh"
 TRAIN = SCRIPTS_DIR / "train_act_v2.sh"
+TRAIN_ROBUST = SCRIPTS_DIR / "train_act_v2_robust.sh"
 TRAIN_SEQUENCE = SCRIPTS_DIR / "train_act_v2_sequence.sh"
 
 
@@ -67,6 +68,32 @@ class ActV2PipelineTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("must be 30 or 50", result.stderr)
+
+    def test_robust_train_uses_lightweight_augmentation_and_60k_steps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = {
+                "dataset_repo_id": "GY-William/lerobot_stack_two_cubes_v2",
+                "subsets": {"50": {"episodes": list(range(50))}},
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(TRAIN_ROBUST), "--dry-run"],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=self.environment(root),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("--steps=60000", result.stdout)
+            self.assertIn("--dataset.image_transforms.enable=true", result.stdout)
+            self.assertIn("--dataset.image_transforms.max_num_transforms=2", result.stdout)
+            self.assertIn('\\"brightness\\"', result.stdout)
+            self.assertIn('\\"contrast\\"', result.stdout)
+            self.assertIn('\\"affine\\"', result.stdout)
+            self.assertIn('\\"scale\\"', result.stdout)
+            self.assertNotIn('\\"saturation\\"', result.stdout)
+            self.assertNotIn('\\"hue\\"', result.stdout)
 
     def test_sequence_dry_run_orders_and_verifies_both_subsets(self):
         with tempfile.TemporaryDirectory() as tmp:
