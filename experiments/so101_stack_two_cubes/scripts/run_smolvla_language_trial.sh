@@ -103,6 +103,17 @@ record_cmd=(
 )
 
 if [[ -f "$dataset_root/meta/info.json" ]]; then
+  if ! "$dry_run"; then
+    recorded_episodes="$("$python_bin" -c '
+import json
+import sys
+print(int(json.load(open(sys.argv[1], encoding="utf-8"))["total_episodes"]))
+' "$dataset_root/meta/info.json")"
+    if (( recorded_episodes >= 10 )); then
+      echo "Condition $condition already has $recorded_episodes/10 episodes; refusing trial 11." >&2
+      exit 1
+    fi
+  fi
   record_cmd+=(--resume=true)
 fi
 

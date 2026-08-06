@@ -13,6 +13,7 @@ from log_smolvla_language_trial import (
     classify_outcome,
     validate_recorded_episode,
 )
+from summarize_smolvla_language_trials import summarize, validate_matrix
 
 
 class SmolVlaLanguageTrialLogTest(unittest.TestCase):
@@ -72,6 +73,53 @@ class SmolVlaLanguageTrialLogTest(unittest.TestCase):
                 append_row(path, row)
             with path.open(newline="", encoding="utf-8") as stream:
                 self.assertEqual(len(list(csv.DictReader(stream))), 1)
+
+    def test_summary_keeps_manipulation_and_instruction_rates_separate(self):
+        rows = []
+        for condition in CONDITIONS:
+            intended, prompt_condition, prompt = CONDITIONS[condition]
+            opposite = "red_on_yellow" if intended == "yellow_on_red" else "yellow_on_red"
+            rows.extend(
+                [
+                    {
+                        "condition": condition,
+                        "trial_index": "1",
+                        "intended_behavior": intended,
+                        "prompt_condition": prompt_condition,
+                        "prompt": prompt,
+                        "observed_behavior": intended,
+                        "manipulation_success": "true",
+                        "instruction_following_success": "true",
+                        "failure_label": "",
+                        "completion_time_s": "",
+                        "video_path": "",
+                        "notes": "",
+                    },
+                    {
+                        "condition": condition,
+                        "trial_index": "2",
+                        "intended_behavior": intended,
+                        "prompt_condition": prompt_condition,
+                        "prompt": prompt,
+                        "observed_behavior": opposite,
+                        "manipulation_success": "true",
+                        "instruction_following_success": "false",
+                        "failure_label": "wrong_color_order",
+                        "completion_time_s": "",
+                        "video_path": "",
+                        "notes": "",
+                    },
+                ]
+            )
+        summaries = summarize(rows)
+        self.assertEqual(summaries["yellow_exact"]["manipulation_rate"], 1.0)
+        self.assertEqual(summaries["yellow_exact"]["instruction_rate"], 0.5)
+        validate_matrix(summaries, 2)
+
+    def test_incomplete_matrix_is_rejected(self):
+        summaries = summarize([])
+        with self.assertRaisesRegex(ValueError, "exactly 10"):
+            validate_matrix(summaries, 10)
 
 
 if __name__ == "__main__":

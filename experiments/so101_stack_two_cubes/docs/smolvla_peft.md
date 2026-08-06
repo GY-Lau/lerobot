@@ -176,6 +176,20 @@ The logger derives manipulation success and instruction-following success
 separately, rejects inconsistent outcome labels, and refuses to log a trial that
 does not have a corresponding recorded episode.
 
+Track progress at any time, then enforce the complete 4 x 10 matrix before
+reporting it:
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/summarize_smolvla_language_trials.py
+
+python experiments/so101_stack_two_cubes/scripts/summarize_smolvla_language_trials.py \
+  --require-complete
+```
+
+The runner refuses an eleventh episode for any condition. The summarizer reports
+Wilson 95% intervals for both metrics and rejects an incomplete or unbalanced
+matrix when `--require-complete` is used.
+
 Report both manipulation success and instruction-following accuracy. A stable
 stack in the opposite color order is a language-selection failure, not a task
 success.

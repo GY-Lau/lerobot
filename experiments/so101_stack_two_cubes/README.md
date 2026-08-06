@@ -139,6 +139,8 @@ remain under the repository-level `outputs/` directory.
   exact/paraphrase, two-order physical evaluation runner with latency logging.
 - [`log_smolvla_language_trial.py`](scripts/log_smolvla_language_trial.py): records
   manipulation and instruction-following outcomes as separate audited metrics.
+- [`summarize_smolvla_language_trials.py`](scripts/summarize_smolvla_language_trials.py):
+  reports four-condition coverage, dual success rates, Wilson intervals, and failures.
 - [`jetson_smolvla_environment.txt`](results/jetson_smolvla_environment.txt): validated
   JetPack, Python, CUDA/BF16, and PEFT package versions.
 - [`generate_trial_plan.py`](scripts/generate_trial_plan.py): deterministic placement
