@@ -18,8 +18,8 @@ checkpoint is not presented as proof of task success.
 | Compute | NVIDIA Jetson Orin NX 16 GB, JetPack 6.2.2, 25 W |
 | Sensor | One fixed front RGB camera, 640 x 480 MJPG at 30 FPS |
 | Task | Stack the yellow cube on top of the red cube |
-| Dataset | `GY-William/lerobot_stack_two_cubes` |
-| Demonstrations | 30 episodes, 17,970 frames, about 20 s each |
+| Datasets | v1 `GY-William/lerobot_stack_two_cubes`; curated v2 `GY-William/lerobot_stack_two_cubes_v2` |
+| Demonstrations | v1: 30 episodes / 17,970 frames; v2: 50 episodes / 29,914 frames; about 20 s each |
 | Evaluation horizon | 20 s, 30 FPS, pose-gated physical trials |
 
 The original data is intentionally preserved as a v1 baseline. Its visual
@@ -34,6 +34,7 @@ not silently cleaned after training.
 | --- | --- | --- | --- |
 | ACT baseline | 30k-step checkpoint; exact config and files pass the checkpoint contract | Training complete; exploratory physical screen complete | Reportable physical evaluation if a precise rate estimate is needed |
 | ACT data efficiency | Deterministic nested 10/20/30 subsets; all three matched 30k-step checkpoints pass | Five-trial screen complete for every checkpoint | Larger paired sample before ranking checkpoints |
+| ACT v2 curation | 50 retained episodes; manual video review; 50/50 clean red and yellow start detections; deterministic nested 30/50 manifest | Collection and audit complete; matched sequential training active | Verify both final checkpoints, then run paired physical evaluation |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA PEFT | Two-task protocol, merge validator, LoRA launcher, and isolated Jetson environment check | Infrastructure ready | Record 30 real inverse-task demonstrations, then smoke test and train |
@@ -82,6 +83,27 @@ warmup: command P50/P95 was approximately 15.4/16.7 ms, effective rate was
 chunk refreshes occurred on only 25 of roughly 2,700 analyzed frames per run.
 The physical outcome differences therefore are not attributable to different
 inference throughput.
+
+## ACT v2 clean-data experiment
+
+The independent v2 collection contains 50 retained episodes and 29,914 frames.
+Every trajectory was reviewed as video; six explicitly rejected files were
+removed with the pre-edit datasets retained as local backups. The final
+start-frame audit found both red and yellow cubes in all 50 episodes with no
+ambiguous or implausibly large color component. The detector's size gate is
+resolution-relative so a valid nearby cube is not rejected merely for being
+wider than a fixed pixel threshold.
+
+The committed manifest deterministically selects a spatially distributed
+30-episode subset and nests it inside the complete 50-episode set. Training
+holds the v1 contract fixed at 30,000 updates, batch size 2, AMP off, and seed
+1000. This creates two controlled comparisons:
+
+1. v1-30 versus v2-30 estimates the effect of cleaner demonstrations.
+2. v2-30 versus v2-50 estimates the effect of more unique clean data.
+
+Both comparisons remain hypotheses until their final checkpoints pass the
+contract verifier and complete the same physical evaluation protocol.
 
 ## ACT versus Diffusion on Jetson
 
@@ -181,7 +203,8 @@ hashes before the publication status is changed from `local_only`.
 | Diffusion 30k checkpoint | Jetson `outputs/train/`; hash in `results/model_artifacts.csv` | Complete locally; Hub model publication pending |
 | Diffusion raw latency logs | Jetson `outputs/eval_latency/` | Machine-readable summaries and hashes committed; raw logs not yet published |
 | ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
-| ACT v2 demonstrations | Independent 50-episode clean-collection protocol with progress limit and backed-up rejection of the last attempt | Recorder ready; collection pending |
+| ACT v2 demonstrations | Jetson cache; 50 episodes / 29,914 frames; committed position audit and subset manifest | Collection and audit complete; Hub publication pending |
+| ACT v2 checkpoints | Jetson `outputs/train/act_stack_two_cubes_v2_{30,50}ep_30k` | Sequential matched training in progress |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
@@ -195,8 +218,9 @@ Claims not yet supported:
 
 ## Next evidence gates
 
-1. Record 50 independent, clean ACT v2 demonstrations and compare nested v2
-   30/50-episode checkpoints against the retained v1 baseline.
+1. Complete and verify nested ACT v2 30/50-episode checkpoints, then compare
+   them against each other and the retained v1 baseline under the same physical
+   protocol.
 2. Decide whether the Diffusion comparison uses non-Jetson inference or a
    separately disclosed asynchronous/smaller deployment experiment.
 3. Record and audit 30 red-on-yellow demonstrations.
