@@ -79,6 +79,21 @@ training contract, and then delegates to the same pose-gated 20-second runner.
 Use `false` for all three reportable runs so AMP is not another changing
 variable. Complete the same 30-trial placement schedule for each checkpoint.
 
+For the clean ACT v2 30/50 comparison, use the corresponding guarded runner:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/run_act_v2_trial.sh \
+  --dry-run 30 false
+
+bash experiments/so101_stack_two_cubes/scripts/run_act_v2_trial.sh \
+  30 false
+```
+
+Replace `30` with `50` for the full-data checkpoint. This wrapper verifies the
+ACT v2 subset manifest and uses distinct `eval_act_v2_30ep_...` and
+`eval_act_v2_50ep_...` datasets, preventing a run label from silently pointing
+to the wrong model artifact.
+
 ## Success definition
 
 A trial succeeds when all conditions hold:

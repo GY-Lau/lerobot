@@ -7,6 +7,7 @@ from pathlib import Path
 from _bootstrap import SCRIPTS_DIR
 
 SCRIPT = SCRIPTS_DIR / "run_act_data_efficiency_trial.sh"
+V2_SCRIPT = SCRIPTS_DIR / "run_act_v2_trial.sh"
 
 
 class ActEvalRunnerTest(unittest.TestCase):
@@ -35,6 +36,33 @@ class ActEvalRunnerTest(unittest.TestCase):
         result = self.run_dry(15)
         self.assertEqual(result.returncode, 2)
         self.assertIn("must be 10, 20, or 30", result.stderr)
+
+    def test_v2_subsets_map_to_distinct_verified_checkpoints(self):
+        for count in (30, 50):
+            with self.subTest(count=count):
+                result = subprocess.run(
+                    ["bash", str(V2_SCRIPT), "--dry-run", str(count), "false"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"eval_act_v2_{count}ep_30k_protocol_v1", result.stdout)
+                self.assertIn(
+                    f"outputs/train/act_stack_two_cubes_v2_{count}ep_30k/checkpoints/030000",
+                    result.stdout,
+                )
+                self.assertIn("act_v2_subsets.json", result.stdout)
+
+    def test_v2_runner_rejects_v1_subset_size(self):
+        result = subprocess.run(
+            ["bash", str(V2_SCRIPT), "--dry-run", "20"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("must be 30 or 50", result.stderr)
 
 
 if __name__ == "__main__":

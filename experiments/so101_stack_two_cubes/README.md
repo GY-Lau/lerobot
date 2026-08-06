@@ -97,6 +97,8 @@ remain under the repository-level `outputs/` directory.
   with automatic dataset resume.
 - [`run_act_data_efficiency_trial.sh`](scripts/run_act_data_efficiency_trial.sh): maps
   10/20/30 episodes to the verified checkpoint and a distinct evaluation run.
+- [`run_act_v2_trial.sh`](scripts/run_act_v2_trial.sh): maps the clean 30/50 ACT v2
+  subsets to distinct verified checkpoints and evaluation datasets.
 - [`analyze_cube_placements.py`](scripts/analyze_cube_placements.py): marker-free red
   and yellow cube localization in normalized camera coordinates.
 - [`diffusion_policy.md`](docs/diffusion_policy.md): matched-comparison design and
