@@ -68,8 +68,15 @@ the recording session.
 
 ## Matched training
 
-Run both checkpoints with the same v1 comparison contract: 30,000 optimizer
-updates, batch size 2, AMP off, and seed 1000.
+Run both checkpoints sequentially with the same v1 comparison contract: 30,000
+optimizer updates, batch size 2, AMP off, and seed 1000. The sequence verifies
+the 30-episode final checkpoint before it starts the 50-episode run:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/train_act_v2_sequence.sh
+```
+
+For manual execution or rerunning just one side of the comparison, use:
 
 ```bash
 bash experiments/so101_stack_two_cubes/scripts/train_act_v2.sh \

@@ -120,6 +120,8 @@ remain under the repository-level `outputs/` directory.
   start frames and generates spatially balanced nested 30/50 subsets.
 - [`train_act_v2.sh`](scripts/train_act_v2.sh): matched-contract ACT v2 trainer for the
   audited 30- and 50-episode subsets.
+- [`train_act_v2_sequence.sh`](scripts/train_act_v2_sequence.sh): guarded sequential
+  30/50 trainer that verifies each final checkpoint before continuing.
 - [`prepare_language_dataset.sh`](scripts/prepare_language_dataset.sh): guarded merge
   of the two color orders into one balanced multi-task dataset.
 - [`validate_language_dataset.py`](scripts/validate_language_dataset.py): verifies
