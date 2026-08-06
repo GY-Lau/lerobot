@@ -8,23 +8,39 @@ import shutil
 import subprocess
 import sys
 import traceback
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
 
-REPO_ID = "GY-William/lerobot_stack_two_cubes_v2"
-TASK = "Stack the yellow cube on top of the red cube"
-TARGET_EPISODES = 50
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
-def dataset_root() -> Path:
+@dataclass(frozen=True)
+class RecordingProtocol:
+    name: str
+    repo_id: str
+    task: str
+    target_episodes: int
+    instruction: str
+
+
+ACT_V2_PROTOCOL = RecordingProtocol(
+    name="ACT v2",
+    repo_id="GY-William/lerobot_stack_two_cubes_v2",
+    task="Stack the yellow cube on top of the red cube",
+    target_episodes=50,
+    instruction="Use one clean attempt; lower and center the yellow cube before release.",
+)
+
+
+def dataset_root(protocol: RecordingProtocol = ACT_V2_PROTOCOL) -> Path:
     base = Path(
         os.environ.get(
             "HF_LEROBOT_HOME", Path.home() / ".cache" / "huggingface" / "lerobot"
         )
     )
-    return base / REPO_ID
+    return base / protocol.repo_id
 
 
 def read_episode_count(root: Path) -> int:
@@ -42,7 +58,7 @@ def validate_resumable_dataset(root: Path, count: int) -> None:
     data_files = list((root / "data").glob("**/*.parquet"))
     if not required_file.is_file() or not episode_files or not data_files:
         raise RuntimeError(
-            f"ACT v2 metadata is incomplete despite declaring {count} episodes; "
+            f"Dataset metadata is incomplete despite declaring {count} episodes; "
             f"refusing to resume: {root}"
         )
 
@@ -70,13 +86,14 @@ def run_pose_check() -> bool:
     return result.returncode == 0
 
 
-def discard_last_episode(expected_count: int) -> None:
+def discard_last_episode(protocol: RecordingProtocol, expected_count: int) -> None:
     env = os.environ.copy()
     env["LEROBOT_PYTHON"] = sys.executable
     subprocess.run(
         [
             "bash",
-            str(SCRIPT_DIR / "discard_last_act_v2_episode.sh"),
+            str(SCRIPT_DIR / "discard_last_dataset_episode.sh"),
+            protocol.repo_id,
             str(expected_count),
         ],
         check=True,
@@ -84,7 +101,7 @@ def discard_last_episode(expected_count: int) -> None:
     )
 
 
-def load_recorder():
+def load_recorder(protocol: RecordingProtocol):
     # Deliberately local: --status and --dry-run stay fast and hardware-free.
     from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
     from lerobot.robots.so_follower.config_so_follower import SOFollowerRobotConfig
@@ -109,9 +126,9 @@ def load_recorder():
             id="lerobot_leader_arm",
         )
         dataset = DatasetRecordConfig(
-            repo_id=REPO_ID,
+            repo_id=protocol.repo_id,
             root=root,
-            single_task=TASK,
+            single_task=protocol.task,
             num_episodes=1,
             episode_time_s=20,
             reset_time_s=0,
@@ -130,9 +147,9 @@ def load_recorder():
     return record, build_config
 
 
-def prompt_record(count: int) -> str:
+def prompt_record(protocol: RecordingProtocol, count: int) -> str:
     return input(
-        f"\nACT v2: {count}/{TARGET_EPISODES} retained. "
+        f"\n{protocol.name}: {count}/{protocol.target_episodes} retained. "
         f"[Enter] record episode {count + 1}, [q] quit: "
     ).strip().lower()
 
@@ -148,11 +165,11 @@ def prompt_review() -> str:
         print("Please enter k, d, q, or x.")
 
 
-def run_session(root: Path) -> int:
+def run_session(root: Path, protocol: RecordingProtocol) -> int:
     count = read_episode_count(root)
     validate_resumable_dataset(root, count)
-    if count >= TARGET_EPISODES:
-        print(f"ACT v2 already contains {count}/{TARGET_EPISODES} episodes.")
+    if count >= protocol.target_episodes:
+        print(f"{protocol.name} already contains {count}/{protocol.target_episodes} episodes.")
         return 0
 
     if root.is_dir() and count == 0:
@@ -161,17 +178,20 @@ def run_session(root: Path) -> int:
 
     require_devices()
     print("Loading LeRobot once (about 25-30 seconds on Jetson) ...", flush=True)
-    record, build_config = load_recorder()
+    record, build_config = load_recorder(protocol)
     print("Recorder ready. No robot or camera has been connected yet.")
 
     while True:
         count = read_episode_count(root)
-        if count >= TARGET_EPISODES:
-            print(f"ACT v2 collection complete: {count}/{TARGET_EPISODES} retained.")
+        if count >= protocol.target_episodes:
+            print(
+                f"{protocol.name} collection complete: "
+                f"{count}/{protocol.target_episodes} retained."
+            )
             return 0
 
-        if prompt_record(count) == "q":
-            print(f"Stopped with {count}/{TARGET_EPISODES} retained episodes.")
+        if prompt_record(protocol, count) == "q":
+            print(f"Stopped with {count}/{protocol.target_episodes} retained episodes.")
             return 0
 
         print("Checking follower start pose ...")
@@ -179,8 +199,8 @@ def run_session(root: Path) -> int:
             print("Start pose check failed; nothing was recorded.")
             continue
 
-        print(f"Episode {count + 1}/{TARGET_EPISODES}: yellow cube on red cube.")
-        print("Use one clean attempt; lower and center the yellow cube before release.")
+        print(f"Episode {count + 1}/{protocol.target_episodes}: {protocol.task}.")
+        print(protocol.instruction)
         recording_error = None
         try:
             record(build_config(root, resume=count > 0))
@@ -202,44 +222,56 @@ def run_session(root: Path) -> int:
         decision = prompt_review()
         if decision in {"d", "x"}:
             print("Discarding the last episode; LeRobot's dataset editor may take a while ...")
-            discard_last_episode(new_count)
+            discard_last_episode(protocol, new_count)
             after_discard = read_episode_count(root)
             if after_discard != count:
                 raise RuntimeError(
                     f"Discard verification failed: expected {count}, found {after_discard}."
                 )
-            print(f"Discarded. ACT v2 remains at {count}/{TARGET_EPISODES}.")
+            print(f"Discarded. {protocol.name} remains at {count}/{protocol.target_episodes}.")
         else:
-            print(f"Kept. ACT v2 now contains {new_count}/{TARGET_EPISODES} episodes.")
+            print(
+                f"Kept. {protocol.name} now contains "
+                f"{new_count}/{protocol.target_episodes} episodes."
+            )
 
         if decision in {"q", "x"}:
             return 0
 
 
-def main() -> int:
+def main(protocol: RecordingProtocol = ACT_V2_PROTOCOL) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--status", action="store_true", help="show progress without loading LeRobot")
     mode.add_argument("--dry-run", action="store_true", help="show the session plan without changing data")
     args = parser.parse_args()
 
-    root = dataset_root()
+    root = dataset_root(protocol)
     count = read_episode_count(root)
     validate_resumable_dataset(root, count)
     if args.status:
         suffix = " (incomplete empty directory detected)" if root.is_dir() and count == 0 else ""
-        print(f"ACT v2 dataset: {count}/{TARGET_EPISODES} retained episodes{suffix}")
+        print(
+            f"{protocol.name} dataset: {count}/{protocol.target_episodes} "
+            f"retained episodes{suffix}"
+        )
         print(f"root: {root}")
         return 0
     if args.dry_run:
-        print(f"ACT v2 persistent session: {count}/{TARGET_EPISODES} retained episodes")
+        print(
+            f"{protocol.name} persistent session: "
+            f"{count}/{protocol.target_episodes} retained episodes"
+        )
         print(f"root: {root}")
-        print(f"next episode: {count + 1 if count < TARGET_EPISODES else 'target reached'}")
+        print(
+            "next episode: "
+            f"{count + 1 if count < protocol.target_episodes else 'target reached'}"
+        )
         print("first startup: one LeRobot import; later episodes reuse the same Python process")
         if root.is_dir() and count == 0:
             print("the incomplete zero-episode directory would be preserved before recording")
         return 0
-    return run_session(root)
+    return run_session(root, protocol)
 
 
 if __name__ == "__main__":

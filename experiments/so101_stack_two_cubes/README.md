@@ -112,6 +112,10 @@ remain under the repository-level `outputs/` directory.
 - [`record_inverse_language_data.sh`](scripts/record_inverse_language_data.sh):
   progress-aware one-episode recorder for the red-on-yellow inverse behavior;
   it stops at the declared 30-episode target.
+- [`record_inverse_language_session.py`](scripts/record_inverse_language_session.py):
+  persistent keep/discard recording loop for the inverse language behavior.
+- [`discard_last_dataset_episode.sh`](scripts/discard_last_dataset_episode.sh): guarded,
+  repository-parameterized last-episode removal with retained source backups.
 - [`record_act_v2_data.sh`](scripts/record_act_v2_data.sh): progress-aware recorder for
   the independent 50-episode, higher-quality yellow-on-red ACT v2 dataset.
 - [`record_act_v2_session.py`](scripts/record_act_v2_session.py): persistent interactive

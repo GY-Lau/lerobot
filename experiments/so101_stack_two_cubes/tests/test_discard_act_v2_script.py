@@ -11,6 +11,7 @@ from pathlib import Path
 from _bootstrap import SCRIPTS_DIR
 
 SCRIPT = SCRIPTS_DIR / "discard_last_act_v2_episode.sh"
+GENERIC_SCRIPT = SCRIPTS_DIR / "discard_last_dataset_episode.sh"
 REPO_ID = Path("GY-William/lerobot_stack_two_cubes_v2")
 
 
@@ -59,6 +60,35 @@ class DiscardActV2ScriptTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("last episode index 6", result.stdout)
             self.assertIn(r"episode_indices=\[6\]", result.stdout)
+
+    def test_generic_discarder_accepts_inverse_repo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            inverse_repo = Path("GY-William/lerobot_stack_red_on_yellow")
+            meta = home / inverse_repo / "meta"
+            meta.mkdir(parents=True)
+            (meta / "info.json").write_text(
+                json.dumps({"total_episodes": 12}), encoding="utf-8"
+            )
+            env = os.environ.copy()
+            env["HF_LEROBOT_HOME"] = str(home)
+            env["LEROBOT_PYTHON"] = sys.executable
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(GENERIC_SCRIPT),
+                    "--dry-run",
+                    str(inverse_repo),
+                    "12",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(r"episode_indices=\[11\]", result.stdout)
+            self.assertIn(str(inverse_repo), result.stdout)
 
 
 if __name__ == "__main__":

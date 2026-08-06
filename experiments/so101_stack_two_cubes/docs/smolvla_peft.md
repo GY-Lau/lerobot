@@ -26,7 +26,18 @@ confounded with position.
 
 ## 1. Record the inverse task
 
-Each invocation records one auditable episode and resumes the same dataset:
+Use the persistent session recorder so LeRobot's approximately 25--30 second
+import cost is paid once. It prompts before each episode and lets you keep or
+discard the saved trajectory immediately, with the discarded source retained
+as a backup:
+
+```bash
+PYTHONNOUSERSITE=1 /home/hai/miniconda3/envs/lerobot/bin/python \
+  experiments/so101_stack_two_cubes/scripts/record_inverse_language_session.py
+```
+
+The original one-shot command remains available for status checks and as a
+fallback:
 
 ```bash
 bash experiments/so101_stack_two_cubes/scripts/record_inverse_language_data.sh --status
@@ -36,9 +47,7 @@ bash experiments/so101_stack_two_cubes/scripts/record_inverse_language_data.sh
 
 Repeat until 30 successful demonstrations have been retained. Failed or
 interrupted demonstrations should not silently remain in the training set.
-The recorder reports the current count and refuses to create episode 31. Since
-the Jetson is headless, judge each attempt immediately and stop before the next
-one if the saved episode needs to be reviewed or removed.
+The recorder reports the current count and refuses to create episode 31.
 
 ## 2. Merge and validate the language dataset
 
