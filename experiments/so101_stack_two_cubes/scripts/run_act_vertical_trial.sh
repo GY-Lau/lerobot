@@ -65,6 +65,17 @@ if [[ ! "$n_action_steps" =~ ^[0-9]+$ ]] || (( n_action_steps < 1 || n_action_st
   exit 2
 fi
 
+# Optional inference-mode overrides (do not change the trained weights):
+#   EVAL_TEMPORAL_ENSEMBLE=<coeff>  smooth + reactive control (blends overlapping
+#       action chunks every step); forces n_action_steps=1 as ACT requires. Try 0.01.
+#   EVAL_EPISODE_TIME_S=<seconds>   longer horizon so multi-attempt recoveries can finish.
+episode_time_s="${EVAL_EPISODE_TIME_S:-20}"
+policy_ensemble_args=()
+if [[ -n "${EVAL_TEMPORAL_ENSEMBLE:-}" ]]; then
+  n_action_steps=1
+  policy_ensemble_args+=("--policy.temporal_ensemble_coeff=$EVAL_TEMPORAL_ENSEMBLE")
+fi
+
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 experiment_dir="$(cd -- "$script_dir/.." && pwd)"
 repo_root="$(cd -- "$experiment_dir/../.." && pwd)"
@@ -108,7 +119,7 @@ record_cmd=(
   "--dataset.root=$dataset_root"
   '--dataset.single_task=Stack the yellow cube on top of the red cube'
   --dataset.num_episodes=1
-  --dataset.episode_time_s=20
+  "--dataset.episode_time_s=$episode_time_s"
   --dataset.reset_time_s=0
   --dataset.fps=30
   --dataset.push_to_hub=false
@@ -117,6 +128,9 @@ record_cmd=(
   "--latency_log_path=$latency_log"
   --latency_warmup_frames=30
 )
+if (( ${#policy_ensemble_args[@]} > 0 )); then
+  record_cmd+=("${policy_ensemble_args[@]}")
+fi
 
 if [[ -f "$dataset_root/meta/info.json" ]]; then
   if [[ ! -f "$dataset_root/meta/tasks.parquet" ]]; then

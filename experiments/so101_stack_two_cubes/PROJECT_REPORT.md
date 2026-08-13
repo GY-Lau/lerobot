@@ -15,12 +15,12 @@ checkpoint is not presented as proof of task success.
 | Component | Configuration |
 | --- | --- |
 | Robot | SO-101 follower, 6 joint/action dimensions |
-| Compute | NVIDIA Jetson Orin NX 16 GB, JetPack 6.2.2, 25 W |
-| Sensor | One fixed front RGB camera, 640 x 480 MJPG at 30 FPS |
+| Compute | NVIDIA Jetson Orin NX 16 GB, JetPack 6.2.2, 25 W (training on 2 x RTX A4500) |
+| Sensor | v1/v2: one fixed front RGB camera. Dual-camera generations: wrist `/dev/video0` + fixed front `/dev/video2`, both 640 x 480 MJPG at 30 FPS |
 | Task | Stack the yellow cube on top of the red cube |
-| Datasets | v1 `GY-William/lerobot_stack_two_cubes`; curated v2 `GY-William/lerobot_stack_two_cubes_v2` |
-| Demonstrations | v1: 30 episodes / 17,970 frames; v2: 50 episodes / 29,914 frames; about 20 s each |
-| Evaluation horizon | 20 s, 30 FPS, pose-gated physical trials |
+| Datasets | v1 `GY-William/lerobot_stack_two_cubes`; curated v2 `..._v2`; `..._dualcam_20ep`; `..._vertical_20ep` (+ `_wristonly` ablation); `..._vertical_redleft_20ep`; merged `..._vertical_combined_40ep` |
+| Demonstrations | v1: 30 episodes / 17,970 frames; v2: 50 episodes / 29,914 frames; each dual-camera generation: 20 episodes / 11,960 frames; about 20 s each |
+| Evaluation horizon | 20 s nominal, 30 FPS, pose-gated physical trials; extended to 35-60 s when studying closed-loop recovery |
 
 The original data is intentionally preserved as a v1 baseline. Its visual
 audit found hands in some start frames, colored clutter, broad unmarked cube
@@ -35,6 +35,12 @@ not silently cleaned after training.
 | ACT baseline | 30k-step checkpoint; exact config and files pass the checkpoint contract | Training complete; exploratory physical screen complete | Reportable physical evaluation if a precise rate estimate is needed |
 | ACT data efficiency | Deterministic nested 10/20/30 subsets; all three matched 30k-step checkpoints pass | Five-trial screen complete for every checkpoint | Larger paired sample before ranking checkpoints |
 | ACT v2 curation | 50 retained episodes; manual video review; 50/50 clean red and yellow start detections; deterministic nested 30/50 manifest; both 30k checkpoints verified | Training complete; v2-30 on Jetson and v2-50 on an RTX A4500; v2-50 hashes reverified after transfer | Run paired physical evaluation on the same Jetson robot setup |
+| Dual-camera + horizontal gripper | 20-episode dataset, 30k checkpoint, teacher-forced diagnostic | 0/6 physical stacks; diagnosed as an observability regression | Superseded by the vertical-gripper generation |
+| Teacher-forced diagnostic | Per-phase, per-joint 1-step open-loop action error for four checkpoints | Complete and reusable | None; but see the open-loop/closed-loop caveat below |
+| Vertical gripper | Wrist side-view restored, validated in 20/20 recorded episodes; 30k checkpoint | Training and physical trials complete | Larger paired sample |
+| Front-camera ablation | wrist+front vs wrist-only on identical data, identical recipe | Both trained and physically tested; open-loop and closed-loop verdicts disagree | Paired trials at the locked deployment config |
+| Closed-loop deployment sweep | `n_action_steps` in {1, 20, 50, 100} and temporal ensembling, on hardware | Complete; configuration locked at n=100, ensembling off | None |
+| Red-left placement redesign | Occlusion verified fixed in recorded video; 20 episodes collected and merged to 40 | A/B training running on the A4500 | Physical trials of both checkpoints at n=100 |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA PEFT | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
@@ -115,6 +121,182 @@ is not a strict training-throughput comparison. Physical policy quality is
 evaluated on the same Jetson robot setup. A same-GPU replica would be required
 before attributing small differences solely to the number of demonstrations.
 
+## Observability experiments: dual camera, gripper orientation, cube layout
+
+This is the project's longest causal chain, and the one that produced its two
+most transferable lessons. It starts from the v1/v2 failure signature — the
+policy knows the whole sequence but lacks centimeter precision at exactly two
+moments, final descent and release — and treats that as a **visual observability**
+problem rather than a data, label, calibration, or optimization problem. The
+expert-trajectory replay had already eliminated those alternatives: five expert
+episodes replayed open-loop on the physical arm executed correctly, so the
+actions and hardware are sound.
+
+### Generation 1: dual camera, horizontal gripper — 0/6
+
+A second fixed front camera was added and 20 episodes recorded
+(`..._dualcam_20ep`), trained under the fixed contract (30,000 updates, batch 8,
+seed 1000, AMP off). Physical result: **0/6 stacks**. Two findings, one
+technical and one procedural:
+
+- Technical: re-orienting the gripper for the dual-camera rig turned the wrist
+  camera **top-down**. It then saw only the top face of the cube, which carries
+  no grasp-height or depth cue, and during placement the **grasped yellow cube
+  occluded the red base cube**. Precision therefore fell entirely on one distant,
+  shallow-angle fixed camera. The intended fix had introduced a regression in the
+  very signal it was meant to improve.
+- Procedural: those six outcomes were **never written to any CSV**. The results
+  existed only as observations on the Jetson, and the scripts that produced them
+  were uncommitted. This report treats that as a result too — an experiment whose
+  outcome is not logged is not evidence.
+
+### The measurement that was missing: teacher-forced action error
+
+Until this point the diagnosis was behavioral (failure pattern plus elimination)
+with no number attached. `scripts/diagnose_teacher_forced_action_error.py` closes
+that gap: it feeds the policy the **expert** observations and compares its
+predicted action against the expert action frame by frame, aggregated per joint
+and per phase, where `d` indexes frames relative to the grasp and release
+instants. Units are degrees; lower is closer to the demonstration.
+
+The dual-camera baseline scored **1.293 deg overall**, with the error
+concentrated exactly where the physical failures were: **1.897 at grasp (d=0)**
+and **2.094 at release (d=-1)**, worst joints shoulder_lift 2.424 and elbow_flex
+1.734. This quantitatively confirmed the phase localization.
+
+It also established the report's most important caveat, immediately: the same
+checkpoint that fits the demonstrations to 1.29 deg scored **0/6 physically**.
+**Low open-loop fitting error does not imply task success.**
+
+### Generation 2: vertical gripper, and a clean front-camera ablation
+
+The gripper was stood **vertical**, restoring the wrist camera's side view. This
+was verified before training rather than assumed: a new pre-record gate,
+`check_wrist_cube_view.py`, requires both the red and the yellow cube to be fully
+in the wrist frame, and it passed in **20/20** recorded episodes
+(`..._vertical_20ep`, 20 episodes / 11,960 frames, wrist + front).
+
+Because the front camera's value was still unproven, a wrist-only copy of the
+**same** dataset was built by removing `observation.images.front` from
+`meta/info.json`, giving a clean single-variable ablation: same episodes, same
+actions, same recipe, one input stream removed.
+
+| Metric (deg) | dualcam, horizontal | vertical, wrist+front | vertical, wrist-only |
+| --- | ---: | ---: | ---: |
+| overall | 1.293 | 1.485 | **1.348** |
+| grasp d=0 | 1.897 | 2.053 | **1.675** |
+| release d=-1 | 2.094 | 2.237 | **1.424** |
+| release d=0 | 1.667 | 2.222 | **1.492** |
+| shoulder_lift | 2.424 | 2.570 | **2.334** |
+| elbow_flex | 1.734 | 2.230 | **2.105** |
+| wrist_roll | 0.788 | 1.083 | **0.851** |
+
+Only the last two columns form a controlled comparison; the dualcam column
+crosses a different recording session and is shown for orientation. Wrist-only
+fit better on **every** row, and by the widest margin at release (1.424 vs 2.237,
+36 percent lower). It also trained about **65 percent faster** (4.0 vs 2.44
+steps/s), since one fewer video stream is decoded per sample.
+
+Read alone, this says the fixed front camera is a distractor rather than an
+information source. The physical trials then showed that reading is wrong, for a
+reason worth stating precisely.
+
+### The deployment parameter that dominated everything
+
+At the inherited setting `n_action_steps=20`, both vertical checkpoints scored
+**0**: wrist-only 0/5, wrist+front 0/3 (the last two trials were skipped once the
+pattern was unambiguous). The failure was not imprecision but **stalling** —
+wrist-only hovered over the yellow cube with the gripper open and never closed;
+wrist+front never even opened the gripper and jittered in place.
+
+ACT predicts a 100-step (about 3.3 s) chunk covering approach, descent and
+closure. Re-planning every 20 steps meant the arm kept re-executing the opening
+"approach" fragment of each fresh chunk and never reached the descent-and-close
+tail. Raising `n_action_steps` to **100** — same checkpoints, same weights, only
+the execution policy changed — moved the grasp rate from 0/5 to **4/5**.
+
+| Config | wrist-only | wrist+front |
+| --- | ---: | ---: |
+| n=20 | 0/5 | 0/3 |
+| n=100 | **1/5** (ep2) | **1/5** (ep0) |
+
+Temporal ensembling, which ACT's authors recommend and which requires
+`n_action_steps=1`, was tested at coefficients 0.01, 0.05 and 0.005. All three
+**stuttered and could not reach the cube** — worse than n=20. With the horizon
+stretched to 120 s it eventually placed accurately, which is diagnostic but not
+deployable. An intermediate sweep at n=50 (35 s, 40 s and 60 s horizons) also
+hesitated and repeatedly re-adjusted above the cube.
+
+The pattern is monotonic and consistent: **this policy degrades the more often it
+re-plans.** Its single-step closed-loop predictions are not stable enough to
+drive frequent re-planning, so short chunks produce hesitation loops. The
+deployment configuration is therefore locked at **`n_action_steps=100`, temporal
+ensembling off**.
+
+This was the single highest-leverage change in the project, and it changed no
+weights. It is worth separating clearly from model quality: for several weeks a
+deployment-parameter artifact was indistinguishable from "the policy cannot
+grasp."
+
+### Why the open-loop metric was misleading
+
+At n=100 both variants scored 1/5, but their **failure modes differed
+qualitatively**. The wrist+front policy repeatedly **recovered**: it would bump
+the top of the yellow cube, lift away, re-align, and grasp on a second or third
+attempt (observed in 4 of 5 trials). The wrist-only policy, having missed, rarely
+recovered. The front camera's contribution is **closed-loop robustness** — a
+global view that lets the policy perceive its own failure and retry.
+
+Teacher-forced error cannot see this. It measures one-step agreement with an
+expert who never fails, so it cannot score recovery from self-induced error. It
+ranked wrist-only first on every row while the physically more capable policy was
+wrist+front. The ablation's numerical verdict was **reversed by direct
+observation of behavior**.
+
+The front camera's cost is real too: jerkier motion, visible joint jumps at each
+3.3 s re-plan boundary, and recoveries that often exhausted the 20 s horizon.
+
+### Generation 3: red-left layout, to fix placement
+
+With grasping working, the remaining wall is **placement**: cubes released too
+high, off-center, or gripped at an edge and dropped. This is the original
+observability problem displaced to the release instant — at that moment the
+**wrist camera is blocked by the held yellow cube** and the **front camera is
+blocked by the gripper body**, so nothing sees the red base cube.
+
+The intervention keeps the hardware fixed and changes the **scene**: place the
+red cube to the **left** of the yellow one, laterally offset, so the wrist camera
+retains a sightline to it while carrying. This was verified before committing to
+a full recording session — in the first two episodes the red cube is plainly
+visible in the lower wrist frame throughout placement, where previously it was
+fully occluded. Twenty consistent episodes were then recorded
+(`..._vertical_redleft_20ep`, 20 episodes / 11,960 frames, wrist + front).
+
+Two checkpoints are training on the A4500 under the unchanged contract, differing
+only in data:
+
+| Arm | Dataset | Episodes / frames | Question |
+| --- | --- | ---: | --- |
+| A | `..._vertical_redleft_20ep` | 20 / 11,960 | Does a consistent, unoccluded placement layout alone fix placement? |
+| B | `..._vertical_combined_40ep` | 40 / 23,920 | Does adding the earlier 20 vertical episodes help, or does mixing two layouts hurt? |
+
+Both will be evaluated at the locked deployment configuration (n=100, ensembling
+off), paired against the existing vertical checkpoints, scoring success plus
+failure label. Until those trials run, the layout change is a **verified
+perception fix with no demonstrated effect on success rate**.
+
+### What this chain establishes
+
+- The failure was observability, and observability is a property of the whole
+  rig: camera pose, gripper orientation, **and object layout** all change what the
+  policy can see. Two of the three fixes required no model change at all.
+- Open-loop fitting metrics are cheap and locally informative — they correctly
+  localized the error to grasp and release — but they **cannot rank policies for
+  closed-loop deployment**, because they cannot measure recovery. Here they gave a
+  confidently wrong ranking.
+- Execution parameters can dominate model quality. `n_action_steps` alone
+  separated 0/5 from 4/5 grasping on identical weights.
+
 ## ACT versus Diffusion on Jetson
 
 ACT predicts a complete action chunk in one forward pass and executes cached
@@ -177,6 +359,32 @@ bash experiments/so101_stack_two_cubes/scripts/run_act_data_efficiency_trial.sh 
   --dry-run 10 false
 ```
 
+Measure per-phase, per-joint teacher-forced action error for any checkpoint:
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/diagnose_teacher_forced_action_error.py \
+  outputs/train/act_stack_two_cubes_vertical_20ep_b8_30k_seed1000/checkpoints/030000
+```
+
+Check the wrist-camera start-scene gate without recording (both cubes must be
+fully in frame):
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/check_wrist_cube_view.py --camera-index 0
+```
+
+Preview a vertical physical trial at the locked deployment configuration:
+
+```bash
+bash experiments/so101_stack_two_cubes/scripts/run_act_vertical_trial.sh wristfront eval_demo 100
+```
+
+Rebuild the combined 40-episode dataset from its two inputs:
+
+```bash
+python experiments/so101_stack_two_cubes/scripts/merge_two_datasets.py --help
+```
+
 Recompute one Diffusion latency summary from its raw log:
 
 ```bash
@@ -227,6 +435,13 @@ hashes before the publication status is changed from `local_only`.
 | ACT physical screen | Five recorded trials per 10/20/30 checkpoint plus trial and latency summaries | Complete as exploratory evidence; not a reportable ranking |
 | ACT v2 demonstrations | Jetson cache; 50 episodes / 29,914 frames; committed position audit and subset manifest | Collection and audit complete; Hub publication pending |
 | ACT v2 checkpoints | Both final checkpoints on Jetson; v2-50 trained in the isolated A4500 workspace | Training and contract verification complete; Hub publication and physical evaluation pending |
+| Dual-camera 20ep dataset + checkpoint | Jetson cache; A4500 `datasets/` and `outputs/train/` | Complete; 0/6 physical outcomes recorded in this report only, never logged to CSV at the time |
+| Vertical 20ep dataset + checkpoint | Jetson cache; A4500; wrist-only ablation copy alongside | Complete; both variants physically tested |
+| Teacher-forced diagnostic summaries | A4500, pulled locally for the four-way comparison | Numbers reproduced in this report; raw summaries not yet committed |
+| Vertical physical trials (n=20, n=100, ensembling, n=50) | Recorded eval episodes on the Jetson; outcomes narrated per trial | Reported here; not yet normalized into `trials.csv` |
+| Red-left 20ep dataset | Jetson cache; transferred to A4500 and load-verified | Collection complete; Hub publication pending |
+| Combined 40ep dataset | A4500 `datasets/..._vertical_combined_40ep`, 40 eps / 23,920 frames | Built by `merge_two_datasets.py`; load-verified |
+| Red-left A/B checkpoints | A4500 `outputs/train/act_stack_two_cubes_{redleft_20ep,combined_40ep}_b8_30k_seed1000` | Training in progress |
 | SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
@@ -236,16 +451,35 @@ Claims not yet supported:
 - that ACT outperforms Diffusion in task success;
 - that SmolVLA follows language commands;
 - that voice input controls the robot;
-- that the local model artifacts are reproducible from a public model repo.
+- that the local model artifacts are reproducible from a public model repo;
+- that wrist+front beats wrist-only on success rate. At n=100 both scored 1/5.
+  The recovery advantage is a repeated behavioral observation, not yet a
+  statistically separated success rate;
+- that the vertical gripper beats the horizontal dual-camera rig on success rate.
+  It is a large improvement (0/6 to 1/5 with 4/5 grasping) confounded with the
+  `n_action_steps` change, which alone accounts for 0/5 to 4/5 grasping;
+- that the red-left layout improves placement. The occlusion fix is verified in
+  recorded video; its effect on success is untested.
 
 ## Next evidence gates
 
-1. Compare the verified ACT v2 30/50-episode checkpoints against each other
+1. Verify the red-left A/B checkpoints, then run paired physical trials of both
+   against the existing vertical checkpoints at the locked deployment
+   configuration, scoring success and failure label. This is the live gate.
+2. Normalize every dual-camera-generation physical trial into `trials.csv` with
+   the existing failure taxonomy, so success rates and intervals are computed
+   from data rather than narrated. Backfill the 0/6 dualcam outcomes.
+3. Re-run the front-camera ablation as a properly paired comparison at n=100,
+   with a recovery-aware metric (attempts per grasp, time to first stable grasp)
+   rather than teacher-forced error alone.
+4. Commit the teacher-forced summaries and the eval configuration alongside each
+   checkpoint, so a reported number is traceable to the run that produced it.
+5. Compare the verified ACT v2 30/50-episode checkpoints against each other
    and the retained v1 baseline under the same physical protocol.
-2. Decide whether the Diffusion comparison uses non-Jetson inference or a
+6. Decide whether the Diffusion comparison uses non-Jetson inference or a
    separately disclosed asynchronous/smaller deployment experiment.
-3. Record and audit 30 red-on-yellow demonstrations.
-4. Run the SmolVLA LoRA resource smoke test, then the declared full training
+7. Record and audit 30 red-on-yellow demonstrations.
+8. Run the SmolVLA LoRA resource smoke test, then the declared full training
    and typed-prompt evaluation.
-5. Publish immutable dataset/model revisions and raw evaluation artifacts
+9. Publish immutable dataset/model revisions and raw evaluation artifacts
    before presenting the project as fully reproducible.
