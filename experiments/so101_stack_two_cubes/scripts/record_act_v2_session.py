@@ -23,6 +23,12 @@ class RecordingProtocol:
     task: str
     target_episodes: int
     instruction: str
+    pose_check_args: tuple[str, ...] = ()
+    camera_devices: tuple[tuple[str, int], ...] = (("front", 0),)
+    # Extra pre-record gates, each as (script_filename, *args) run with the same
+    # interpreter before recording an episode. A non-zero exit skips recording,
+    # exactly like a failed start-pose check. Default: none (backward compatible).
+    pre_record_checks: tuple[tuple[str, ...], ...] = ()
 
 
 ACT_V2_PROTOCOL = RecordingProtocol(
@@ -70,20 +76,35 @@ def archive_incomplete_dataset(root: Path) -> Path:
     return backup
 
 
-def require_devices() -> None:
-    missing = [
-        path for path in ("/dev/ttyACM0", "/dev/ttyACM1", "/dev/video0") if not Path(path).exists()
-    ]
+def require_devices(protocol: RecordingProtocol) -> None:
+    required_paths = ["/dev/ttyACM0", "/dev/ttyACM1"]
+    required_paths.extend(f"/dev/video{index}" for _, index in protocol.camera_devices)
+    missing = [path for path in required_paths if not Path(path).exists()]
     if missing:
         raise RuntimeError(f"Required device path(s) do not exist: {', '.join(missing)}")
 
 
-def run_pose_check() -> bool:
+def run_pose_check(protocol: RecordingProtocol) -> bool:
+    command = [sys.executable, str(SCRIPT_DIR / "check_start_pose.py")]
+    # Default to the relaxed profile unless the protocol selects its own.
+    if "--profile" not in protocol.pose_check_args:
+        command += ["--profile", "relaxed"]
+    command += list(protocol.pose_check_args)
     result = subprocess.run(
-        [sys.executable, str(SCRIPT_DIR / "check_start_pose.py"), "--profile", "relaxed"],
+        command,
         check=False,
     )
     return result.returncode == 0
+
+
+def run_extra_checks(protocol: RecordingProtocol) -> bool:
+    """Run each configured pre-record gate; return False on the first failure."""
+    for check in protocol.pre_record_checks:
+        script, *check_args = check
+        command = [sys.executable, str(SCRIPT_DIR / script), *check_args]
+        if subprocess.run(command, check=False).returncode != 0:
+            return False
+    return True
 
 
 def discard_last_episode(protocol: RecordingProtocol, expected_count: int) -> None:
@@ -109,17 +130,20 @@ def load_recorder(protocol: RecordingProtocol):
     from lerobot.teleoperators.so_leader.config_so_leader import SOLeaderTeleopConfig
 
     def build_config(root: Path, resume: bool):
-        camera = OpenCVCameraConfig(
-            index_or_path=0,
-            width=640,
-            height=480,
-            fps=30,
-            fourcc="MJPG",
-        )
+        cameras = {
+            name: OpenCVCameraConfig(
+                index_or_path=index,
+                width=640,
+                height=480,
+                fps=30,
+                fourcc="MJPG",
+            )
+            for name, index in protocol.camera_devices
+        }
         robot = SOFollowerRobotConfig(
             port="/dev/ttyACM0",
             id="lerobot_follower_arm",
-            cameras={"front": camera},
+            cameras=cameras,
         )
         teleop = SOLeaderTeleopConfig(
             port="/dev/ttyACM1",
@@ -176,7 +200,7 @@ def run_session(root: Path, protocol: RecordingProtocol) -> int:
         backup = archive_incomplete_dataset(root)
         print(f"Preserved incomplete zero-episode dataset at: {backup}")
 
-    require_devices()
+    require_devices(protocol)
     print("Loading LeRobot once (about 25-30 seconds on Jetson) ...", flush=True)
     record, build_config = load_recorder(protocol)
     print("Recorder ready. No robot or camera has been connected yet.")
@@ -195,8 +219,12 @@ def run_session(root: Path, protocol: RecordingProtocol) -> int:
             return 0
 
         print("Checking follower start pose ...")
-        if not run_pose_check():
+        if not run_pose_check(protocol):
             print("Start pose check failed; nothing was recorded.")
+            continue
+
+        if not run_extra_checks(protocol):
+            print("Pre-record scene check failed; nothing was recorded.")
             continue
 
         print(f"Episode {count + 1}/{protocol.target_episodes}: {protocol.task}.")
@@ -263,6 +291,12 @@ def main(protocol: RecordingProtocol = ACT_V2_PROTOCOL) -> int:
             f"{count}/{protocol.target_episodes} retained episodes"
         )
         print(f"root: {root}")
+        print(
+            "cameras: "
+            + ", ".join(
+                f"{name}=/dev/video{index}" for name, index in protocol.camera_devices
+            )
+        )
         print(
             "next episode: "
             f"{count + 1 if count < protocol.target_episodes else 'target reached'}"
