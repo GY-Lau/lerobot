@@ -41,7 +41,7 @@ not silently cleaned after training.
 | Front-camera ablation | wrist+front vs wrist-only on identical data, identical recipe | Both trained and physically tested; open-loop and closed-loop verdicts disagree | Paired trials at the locked deployment config |
 | Closed-loop deployment sweep | `n_action_steps` in {1, 20, 50, 100} and temporal ensembling, on hardware | Complete; configuration locked at n=100, ensembling off | None |
 | Red-left placement redesign | Occlusion verified fixed in recorded video; 20 episodes collected and merged to 40; both 30k checkpoints trained | Physically tested at n=100: redleft-20 scored 2/5 under matched lighting, the best result in the project so far | Larger paired sample; placement remains the binding failure |
-| Layout-mixing / multimodality | Front-camera start-frame red-cube distributions (20/20 clean per dataset) plus signed teacher-forced release error on shared episodes | Merging disjoint layouts measurably hurt; zero v-axis overlap and a release bias ratio of 0.92 versus 0.09 exclude underfitting | Sample z from the prior at inference to localize the averaging to the CVAE latent |
+| Layout-mixing / multimodality | Front-camera red-cube distributions (20/20 clean per dataset), signed teacher-forced release error, and a prior-sampling latent probe over 205 release frames | Merging disjoint layouts measurably hurt; underfitting excluded by a 0.92 bias ratio, and the CVAE-latent explanation excluded by the probe | None for the mechanism; the fix now belongs to observability or policy class |
 | Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
@@ -364,19 +364,55 @@ normalized u, roughly 6 px. Its 5/5 grasp rate was therefore measured on a
 nearly fixed start configuration and does not demonstrate spatial
 generalization.
 
-### One mechanism at three levels
+### Testing the architectural explanation, and discarding it
 
 ACT is a CVAE. Its style encoder is fed `[cls, robot_state, action_sequence]`
 and **no images** (`src/lerobot/policies/act/modeling_act.py`), so the latent z
-absorbs whatever in the demonstrated action the robot state does not explain —
-including which of several valid targets the demonstrator chose. At inference the
-latent is set to **zero**: `use_vae` is true, but the sampling branch is gated on
-`self.training`, so deployment takes the else-branch and the decoder returns the
-**conditional mean** of the action distribution given the observation. When the
-observation does not disambiguate the target, that mean is not a valid action.
+is positioned to absorb whatever in the demonstrated action the robot state does
+not explain — including which of several valid targets the demonstrator chose. At
+inference the latent is set to **zero**: `use_vae` is true, but the sampling
+branch is gated on `self.training`, so deployment takes the else-branch and the
+decoder returns the **conditional mean** of the action distribution given the
+observation.
 
-This means the CVAE can **hide an observability defect during training**, where
-the loss looks healthy, and expose it only at deployment.
+That suggested an appealing story: the latent absorbs the mode during training,
+where the loss looks healthy, and zeroing it at inference discards the answer. It
+is testable, so it was tested rather than asserted.
+
+`scripts/act/probe_latent_multimodality.py` injects a chosen latent with a
+forward pre-hook on the module that consumes it, then compares, against the
+expert action at 205 release frames: the deployed `z = 0` prediction, and
+best-of-K over K = 32 draws from the prior. If the latent carried the mode, some
+draw should recover the expert action markedly better than zero does.
+
+| | combined-40 | redleft-20 |
+| --- | ---: | ---: |
+| MAE at `z = 0` (deployment) | 2.479 | 1.829 |
+| MAE best-of-32 sampled z | 2.465 (**+0.6%**) | 1.810 (**+1.0%**) |
+| MAE mean-of-32 sampled z | 2.480 | 1.829 |
+| Largest per-joint spread across draws | **0.027** | **0.032** |
+
+**The hypothesis is false.** Drawing a full prior standard deviation of z moves
+the predicted action by hundredths of a degree while the error itself is 2 to 7
+degrees, and best-of-32 is worth about one percent. The decoder ignores the
+latent almost entirely.
+
+The injection is working, not silently failing: a dead hook would give a spread
+of exactly zero, and the measured spread is small but non-zero. Mean-of-K
+tracking `z = 0` is the second sanity check.
+
+This is **posterior collapse**. At the default `kl_weight = 10.0` the KL term
+pushes the approximate posterior onto the prior, the latent carries no
+information, and the decoder learns to ignore it. In this configuration ACT is
+effectively `use_vae=false` — a plain L1 regressor with an inert 32-dimensional
+input.
+
+Two consequences follow. Raising `kl_weight` to force information out of the
+latent is pointless, because it has already collapsed; the lever, if one wanted z
+to do work, points the other way. And the averaging is **not** an artifact of
+inference-time zeroing: it happens in the decoder, which genuinely never learned
+to read the release target from pixels and therefore emits one action — the mean
+over the training modes — for a given observation.
 
 The same "averaging destroys multimodal actions" principle accounts for three
 independent results in this project:
@@ -384,21 +420,26 @@ independent results in this project:
 | Level | Result | Evidence |
 | --- | --- | --- |
 | Data | merging two disjoint target layouts hurt (0/6 vs 2/5) | zero overlap on the red cube's image v-axis; predicted release 21 px short |
-| Architecture | z = 0 at inference returns the conditional mean | release bias ratio 0.92 vs 0.09 in the control |
+| Policy class | the head is unimodal, so one observation yields one action — the mean over the training modes | release bias ratio 0.92 vs 0.09 in the control; latent probe shows the CVAE is inert, so this is a plain regressor |
 | Deployment | small `n_action_steps`, and temporal ensembling, average more | 0/5 grasping at n=20 vs 4/5 at n=100 |
 
 Temporal ensembling is the same effect at a third level: it averages overlapping
 chunks, and LeRobot requires `n_action_steps=1` when it is enabled — which is
 why every ensembling coefficient tested stuttered.
 
-Which level the merged checkpoint's averaging actually occurs at is still open.
-Sampling z from the prior at inference and checking whether rollouts become
-bimodal would separate "the latent absorbed the mode" from "the decoder never
-learned the visual cue". Raising `kl_weight` (default 10.0), shrinking
-`latent_dim` (default 32), or setting `use_vae=false` as a baseline are the
-corresponding knobs. A policy class that **samples** from the action distribution
-instead of returning its mean — diffusion, or the flow matching used by SmolVLA —
-removes the mismatch by construction.
+Note what the middle row is **not**. The appealing version of it — the latent
+absorbed the mode and inference-time zeroing threw it away — was tested and is
+false. The latent is collapsed, so there is no hidden answer to recover and no
+latent-side hyperparameter that fixes this. What remains is the plainer
+statement: a policy whose head returns a single action per observation cannot
+represent two valid targets, so it returns their average.
+
+That leaves exactly two levers. Make the target observable at the moment it
+matters, which is what the gripper-orientation and red-left changes did and what
+the remaining placement failures still call for. Or use a policy class that
+**samples** from the action distribution instead of returning its mean — diffusion,
+or the flow matching used by SmolVLA — which removes the failure by construction.
+The second is the motivation for the SmolVLA comparison on this same data.
 
 ### What this chain establishes
 
@@ -588,9 +629,13 @@ Claims not yet supported:
 - that merging the two layouts is harmful *by a statistically separated margin*.
   2/5 versus 0/6 gives a Fisher exact p of about 0.18. The claim rests on the
   agreement of two independent mechanism measurements, not on the trial counts;
-- that the averaging in the merged checkpoint happens inside the CVAE latent.
-  A decoder that never learned the visual cue produces the same signature; only
-  the prior-sampling test separates the two;
+- that the averaging happens inside the CVAE latent. This was tested and is
+  false: the latent is posterior-collapsed, best-of-32 prior draws beat `z = 0`
+  by about one percent, and per-joint spread across draws is under 0.04 degrees.
+  ACT here is effectively a plain L1 regressor;
+- that ACT's variational objective contributes anything in this configuration.
+  It does not, at `kl_weight = 10.0` on 20-40 episodes. Whether a lower KL weight
+  would make the latent useful here is untested;
 - that the redleft grasp rate generalizes spatially. Its yellow cube starts
   within a 0.009-wide band of normalized image u, roughly 6 pixels, so 5/5
   grasping was measured on a nearly fixed start configuration;
@@ -607,10 +652,10 @@ Claims not yet supported:
 2. Re-run the three unlit redleft trials with the room light on, so the redleft
    estimate rests on eight matched-lighting trials rather than five, and decide
    whether illumination is fixed by protocol or covered by recorded data.
-3. Sample z from the prior at inference on the merged checkpoint and check
-   whether rollouts become bimodal. This separates "the latent absorbed the
-   mode" from "the decoder never learned the visual cue" and is the cheapest
-   remaining experiment.
+3. Done: the prior-sampling probe showed the latent is inert, which removes the
+   architectural explanation and leaves observability and policy class as the
+   only levers. Optional follow-up, low priority: retrain with a lower
+   `kl_weight` to see whether a non-collapsed latent behaves differently.
 4. Collect placement-focused redleft episodes with a genuine spread of cube
    start positions, since the current set is close to a single configuration.
    Do not merge them with the earlier layout.

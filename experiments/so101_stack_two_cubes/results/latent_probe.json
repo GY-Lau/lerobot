@@ -1,0 +1,86 @@
+{
+  "combined_40ep": {
+    "model": "outputs/train/act_stack_two_cubes_combined_40ep_b8_30k_seed1000/checkpoints/030000/pretrained_model",
+    "repo_id": "GY-William/lerobot_stack_two_cubes_vertical_redleft_20ep",
+    "frames": 205,
+    "samples": 32,
+    "mae_z0": 2.4787,
+    "mae_best_of_k": 2.4649,
+    "mae_mean_of_k": 2.4802,
+    "best_of_k_improvement_pct": 0.55,
+    "per_joint": {
+      "shoulder_pan.pos": {
+        "spread": 0.0038,
+        "z0": 0.5084,
+        "best_k": 0.5061
+      },
+      "shoulder_lift.pos": {
+        "spread": 0.014,
+        "z0": 2.1726,
+        "best_k": 2.1604
+      },
+      "elbow_flex.pos": {
+        "spread": 0.0151,
+        "z0": 3.002,
+        "best_k": 2.9889
+      },
+      "wrist_flex.pos": {
+        "spread": 0.0083,
+        "z0": 1.5034,
+        "best_k": 1.4994
+      },
+      "wrist_roll.pos": {
+        "spread": 0.0065,
+        "z0": 1.0013,
+        "best_k": 0.997
+      },
+      "gripper.pos": {
+        "spread": 0.0269,
+        "z0": 6.6845,
+        "best_k": 6.6379
+      }
+    }
+  },
+  "redleft_20ep": {
+    "model": "outputs/train/act_stack_two_cubes_redleft_20ep_b8_30k_seed1000/checkpoints/030000/pretrained_model",
+    "repo_id": "GY-William/lerobot_stack_two_cubes_vertical_redleft_20ep",
+    "frames": 205,
+    "samples": 32,
+    "mae_z0": 1.8289,
+    "mae_best_of_k": 1.8102,
+    "mae_mean_of_k": 1.829,
+    "best_of_k_improvement_pct": 1.02,
+    "per_joint": {
+      "shoulder_pan.pos": {
+        "spread": 0.0041,
+        "z0": 0.6197,
+        "best_k": 0.6165
+      },
+      "shoulder_lift.pos": {
+        "spread": 0.0162,
+        "z0": 1.8884,
+        "best_k": 1.8684
+      },
+      "elbow_flex.pos": {
+        "spread": 0.0187,
+        "z0": 1.6838,
+        "best_k": 1.6595
+      },
+      "wrist_flex.pos": {
+        "spread": 0.0085,
+        "z0": 1.1388,
+        "best_k": 1.1339
+      },
+      "wrist_roll.pos": {
+        "spread": 0.0072,
+        "z0": 0.9707,
+        "best_k": 0.9675
+      },
+      "gripper.pos": {
+        "spread": 0.0324,
+        "z0": 4.6719,
+        "best_k": 4.6155
+      }
+    }
+  }
+}
