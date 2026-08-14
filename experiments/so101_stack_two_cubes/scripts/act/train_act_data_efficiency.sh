@@ -76,6 +76,12 @@ fi
 
 export PYTHONNOUSERSITE=1
 
+# Dataloader workers. Defaults to 0 so every checkpoint trained so far stays
+# reproducible; video decode is otherwise serialised with the training step and
+# becomes the bottleneck on multi-camera datasets. Raise it via the environment
+# (about half the cores: 8 on the A4500 host, 4 on the Jetson).
+num_workers="${LEROBOT_NUM_WORKERS:-0}"
+
 train_cmd=(
   "$train_bin"
   "--dataset.repo_id=$dataset_repo"
@@ -88,7 +94,7 @@ train_cmd=(
   "--output_dir=$output_dir"
   "--job_name=$run_name"
   "--batch_size=$batch_size"
-  --num_workers=0
+  "--num_workers=$num_workers"
   "--steps=$steps"
   --log_freq=100
   --save_checkpoint=true

@@ -79,6 +79,12 @@ else
   expected_tasks=$'Stack the yellow cube on top of the red cube\nStack the red cube on top of the yellow cube'
 fi
 
+# Dataloader workers. Defaults to 0 so every checkpoint trained so far stays
+# reproducible; video decode is otherwise serialised with the training step and
+# becomes the bottleneck on multi-camera datasets. Raise it via the environment
+# (about half the cores: 8 on the A4500 host, 4 on the Jetson).
+num_workers="${LEROBOT_NUM_WORKERS:-0}"
+
 gate_cmd=(
   "$python_bin" "$script_dir/validate_language_dataset.py" "$dataset_root"
   "--min-tasks=$min_tasks"
@@ -113,7 +119,7 @@ train_cmd=(
   "--output_dir=$output_dir"
   "--job_name=$run_name"
   "--batch_size=$batch_size"
-  --num_workers=0
+  "--num_workers=$num_workers"
   "--steps=$steps"
   --log_freq=50
   --save_checkpoint=true
