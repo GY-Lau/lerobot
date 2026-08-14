@@ -6,8 +6,8 @@ from pathlib import Path
 
 from _bootstrap import SCRIPTS_DIR
 
-SCRIPT = SCRIPTS_DIR / "run_act_data_efficiency_trial.sh"
-V2_SCRIPT = SCRIPTS_DIR / "run_act_v2_trial.sh"
+SCRIPT = SCRIPTS_DIR / "act" / "run_act_data_efficiency_trial.sh"
+V2_SCRIPT = SCRIPTS_DIR / "act" / "run_act_v2_trial.sh"
 
 
 class ActEvalRunnerTest(unittest.TestCase):

@@ -10,8 +10,8 @@ from pathlib import Path
 
 from _bootstrap import SCRIPTS_DIR
 
-SCRIPT = SCRIPTS_DIR / "discard_last_act_v2_episode.sh"
-GENERIC_SCRIPT = SCRIPTS_DIR / "discard_last_dataset_episode.sh"
+SCRIPT = SCRIPTS_DIR / "act" / "discard_last_act_v2_episode.sh"
+GENERIC_SCRIPT = SCRIPTS_DIR / "common" / "discard_last_dataset_episode.sh"
 REPO_ID = Path("GY-William/lerobot_stack_two_cubes_v2")
 
 

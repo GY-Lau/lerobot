@@ -40,7 +40,9 @@ not silently cleaned after training.
 | Vertical gripper | Wrist side-view restored, validated in 20/20 recorded episodes; 30k checkpoint | Training and physical trials complete | Larger paired sample |
 | Front-camera ablation | wrist+front vs wrist-only on identical data, identical recipe | Both trained and physically tested; open-loop and closed-loop verdicts disagree | Paired trials at the locked deployment config |
 | Closed-loop deployment sweep | `n_action_steps` in {1, 20, 50, 100} and temporal ensembling, on hardware | Complete; configuration locked at n=100, ensembling off | None |
-| Red-left placement redesign | Occlusion verified fixed in recorded video; 20 episodes collected and merged to 40 | A/B training running on the A4500 | Physical trials of both checkpoints at n=100 |
+| Red-left placement redesign | Occlusion verified fixed in recorded video; 20 episodes collected and merged to 40; both 30k checkpoints trained | Physically tested at n=100: redleft-20 scored 2/5 under matched lighting, the best result in the project so far | Larger paired sample; placement remains the binding failure |
+| Layout-mixing / multimodality | Front-camera start-frame red-cube distributions (20/20 clean per dataset) plus signed teacher-forced release error on shared episodes | Merging disjoint layouts measurably hurt; zero v-axis overlap and a release bias ratio of 0.92 versus 0.09 exclude underfitting | Sample z from the prior at inference to localize the averaging to the CVAE latent |
+| Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA PEFT | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
@@ -153,7 +155,7 @@ technical and one procedural:
 ### The measurement that was missing: teacher-forced action error
 
 Until this point the diagnosis was behavioral (failure pattern plus elimination)
-with no number attached. `scripts/diagnose_teacher_forced_action_error.py` closes
+with no number attached. `scripts/act/diagnose_teacher_forced_action_error.py` closes
 that gap: it feeds the policy the **expert** observations and compares its
 predicted action against the expert action frame by frame, aggregated per joint
 and per phase, where `d` indexes frames relative to the grasp and release
@@ -272,7 +274,7 @@ visible in the lower wrist frame throughout placement, where previously it was
 fully occluded. Twenty consistent episodes were then recorded
 (`..._vertical_redleft_20ep`, 20 episodes / 11,960 frames, wrist + front).
 
-Two checkpoints are training on the A4500 under the unchanged contract, differing
+Two checkpoints were trained on the A4500 under the unchanged contract, differing
 only in data:
 
 | Arm | Dataset | Episodes / frames | Question |
@@ -280,10 +282,123 @@ only in data:
 | A | `..._vertical_redleft_20ep` | 20 / 11,960 | Does a consistent, unoccluded placement layout alone fix placement? |
 | B | `..._vertical_combined_40ep` | 40 / 23,920 | Does adding the earlier 20 vertical episodes help, or does mixing two layouts hurt? |
 
-Both will be evaluated at the locked deployment configuration (n=100, ensembling
-off), paired against the existing vertical checkpoints, scoring success plus
-failure label. Until those trials run, the layout change is a **verified
-perception fix with no demonstrated effect on success rate**.
+Both were then evaluated on hardware at the locked deployment configuration
+(n=100, ensembling off), with the episode horizon extended to 40 s.
+
+| Checkpoint | Trials | Success | Wilson 95% CI |
+| --- | ---: | ---: | --- |
+| A, redleft-20, all trials | 8 | 2 (25%) | 7.1% - 59.1% |
+| A, redleft-20, matched lighting only | 5 | 2 (40%) | 11.8% - 76.9% |
+| B, combined-40, matched lighting | 6 | 0 (0%) | 0.0% - 39.0% |
+
+**2/5 is the best result the project has produced.** Two findings came out of
+these fourteen trials, one of them unplanned.
+
+### An unguarded distribution shift: illumination
+
+The demonstrations were recorded at night with the room light on. The first
+three arm-A trials ran the next morning in daylight with the light **off**, and
+the policy **never completed a grasp in any of them (0/3)**. With the light on it
+completed a grasp in **5/5**.
+
+That is the largest single-factor effect measured anywhere in this project, and
+it came from a variable nobody was controlling. The pre-trial gates check that
+both cubes are visible; they do not check illumination. The three unlit trials
+are reported separately above rather than dropped, and the matched-lighting rows
+carry the smaller n that honesty requires.
+
+### Adding data made it worse, and the mechanism is measurable
+
+Under matched lighting arm B scored 0/6 against arm A's 2/5, and its failures had
+a distinct signature: it grasped normally (5/6) but released **short of the red
+cube, without reaching even its edge** — something arm A never did. Arm A's
+placement failures were "at the edge, then rolled off"; arm B's were "nowhere
+near it".
+
+Front-camera start-frame detections locate the red cube in normalized image
+coordinates across both datasets (`scripts/common/analyze_cube_placements.py`,
+20/20 clean detections in each):
+
+| Dataset | red u (median, range) | red v (median, range) |
+| --- | --- | --- |
+| vertical-20 (earlier layout) | 0.519 [0.458, 0.585] | 0.277 [0.248, 0.330] |
+| redleft-20 (evaluation layout) | 0.558 [0.492, 0.605] | 0.431 [0.398, 0.453] |
+
+The horizontal axis overlaps substantially. The vertical axis **does not overlap
+at all**: 0.330 maximum versus 0.398 minimum, a gap of 0.068 (about 33 px at 480
+height), with medians 0.154 apart (about 74 px). A policy splitting the
+difference would release near v = 0.354 — **0.044 short of the nearest edge of
+the evaluation-layout red cube, about 21 px**, in the direction actually
+observed.
+
+Interpolation and underfitting both produce larger error, so a signed diagnostic
+is needed to separate them. Both checkpoints were run teacher-forced on the
+**same** redleft episodes and the same 41 release events, and the per-frame CSV
+was reduced to a **bias ratio**: absolute mean signed error divided by mean
+absolute error. Near 1 means a systematic one-directional offset; near 0 means
+zero-mean noise.
+
+| Joint at release | combined-40 signed | ratio | redleft-20 signed | ratio |
+| --- | ---: | ---: | ---: | ---: |
+| shoulder_lift | -2.030 | **0.93** | +1.690 | 0.91 |
+| elbow_flex | +2.836 | **0.92** | -1.266 | 0.79 |
+| wrist_flex | +1.118 | 0.75 | +0.334 | 0.30 |
+| wrist_roll | +0.835 | 0.84 | +0.421 | 0.42 |
+| shoulder_pan | +0.375 | 0.71 | +0.151 | 0.25 |
+| gripper | +5.047 | 0.77 | -0.401 | 0.09 |
+
+The merged checkpoint carries a directional bias on **all six** joints; the
+control carries one on two. Underfitting predicts a *low* ratio; the measured
+ratio is 0.92, so underfitting is excluded. On the two joints that set arm
+extension the offsets are **opposite in sign** to the control (differences of
+-3.72 and +4.10 degrees), and the gripper opens far more than the expert exactly
+where the control is pure noise — matching "released before reaching the cube".
+
+Joint sign conventions were not independently verified, so this establishes a
+systematic, direction-consistent configuration offset rather than a specific
+geometric direction. The geometric direction comes from the image-space
+measurement above. The two lines of evidence are independent and agree.
+
+One caveat on scope: arm A's yellow cube starts within a 0.009-wide band of
+normalized u, roughly 6 px. Its 5/5 grasp rate was therefore measured on a
+nearly fixed start configuration and does not demonstrate spatial
+generalization.
+
+### One mechanism at three levels
+
+ACT is a CVAE. Its style encoder is fed `[cls, robot_state, action_sequence]`
+and **no images** (`src/lerobot/policies/act/modeling_act.py`), so the latent z
+absorbs whatever in the demonstrated action the robot state does not explain —
+including which of several valid targets the demonstrator chose. At inference the
+latent is set to **zero**: `use_vae` is true, but the sampling branch is gated on
+`self.training`, so deployment takes the else-branch and the decoder returns the
+**conditional mean** of the action distribution given the observation. When the
+observation does not disambiguate the target, that mean is not a valid action.
+
+This means the CVAE can **hide an observability defect during training**, where
+the loss looks healthy, and expose it only at deployment.
+
+The same "averaging destroys multimodal actions" principle accounts for three
+independent results in this project:
+
+| Level | Result | Evidence |
+| --- | --- | --- |
+| Data | merging two disjoint target layouts hurt (0/6 vs 2/5) | zero overlap on the red cube's image v-axis; predicted release 21 px short |
+| Architecture | z = 0 at inference returns the conditional mean | release bias ratio 0.92 vs 0.09 in the control |
+| Deployment | small `n_action_steps`, and temporal ensembling, average more | 0/5 grasping at n=20 vs 4/5 at n=100 |
+
+Temporal ensembling is the same effect at a third level: it averages overlapping
+chunks, and LeRobot requires `n_action_steps=1` when it is enabled — which is
+why every ensembling coefficient tested stuttered.
+
+Which level the merged checkpoint's averaging actually occurs at is still open.
+Sampling z from the prior at inference and checking whether rollouts become
+bimodal would separate "the latent absorbed the mode" from "the decoder never
+learned the visual cue". Raising `kl_weight` (default 10.0), shrinking
+`latent_dim` (default 32), or setting `use_vae=false` as a baseline are the
+corresponding knobs. A policy class that **samples** from the action distribution
+instead of returning its mean — diffusion, or the flow matching used by SmolVLA —
+removes the mismatch by construction.
 
 ### What this chain establishes
 
@@ -296,6 +411,16 @@ perception fix with no demonstrated effect on success rate**.
   confidently wrong ranking.
 - Execution parameters can dominate model quality. `n_action_steps` alone
   separated 0/5 from 4/5 grasping on identical weights.
+- **More data is not automatically better.** Twenty additional episodes whose
+  target distribution did not overlap the evaluation layout moved the policy from
+  2/5 to 0/6. Dataset merges need a distribution check, not just an episode count.
+- Averaging is the recurring adversary, and it enters at three separate levels —
+  data curation, the CVAE latent at inference, and chunk re-planning. Diagnosing
+  it needs **signed** error, not MAE: the two hypotheses differ in the sign
+  structure of the residual, not its magnitude.
+- Evaluation conditions are part of the experiment. An uncontrolled lighting
+  change produced a larger effect (5/5 versus 0/3 grasping) than any model
+  intervention attempted here.
 
 ## ACT versus Diffusion on Jetson
 
@@ -458,28 +583,51 @@ Claims not yet supported:
 - that the vertical gripper beats the horizontal dual-camera rig on success rate.
   It is a large improvement (0/6 to 1/5 with 4/5 grasping) confounded with the
   `n_action_steps` change, which alone accounts for 0/5 to 4/5 grasping;
+- that the red-left layout beats the earlier vertical layout on success rate.
+  2/5 is the best result so far but rests on five matched-lighting trials;
+- that merging the two layouts is harmful *by a statistically separated margin*.
+  2/5 versus 0/6 gives a Fisher exact p of about 0.18. The claim rests on the
+  agreement of two independent mechanism measurements, not on the trial counts;
+- that the averaging in the merged checkpoint happens inside the CVAE latent.
+  A decoder that never learned the visual cue produces the same signature; only
+  the prior-sampling test separates the two;
+- that the redleft grasp rate generalizes spatially. Its yellow cube starts
+  within a 0.009-wide band of normalized image u, roughly 6 pixels, so 5/5
+  grasping was measured on a nearly fixed start configuration;
 - that the red-left layout improves placement. The occlusion fix is verified in
   recorded video; its effect on success is untested.
 
 ## Next evidence gates
 
-1. Verify the red-left A/B checkpoints, then run paired physical trials of both
-   against the existing vertical checkpoints at the locked deployment
-   configuration, scoring success and failure label. This is the live gate.
-2. Normalize every dual-camera-generation physical trial into `trials.csv` with
+1. Normalize every dual-camera-generation physical trial into `trials.csv` with
    the existing failure taxonomy, so success rates and intervals are computed
-   from data rather than narrated. Backfill the 0/6 dualcam outcomes.
-3. Re-run the front-camera ablation as a properly paired comparison at n=100,
+   from data rather than narrated. This now covers 14 further trials (8 redleft,
+   6 combined) plus the 0/6 dualcam backfill. This is the live gate: the
+   headline numbers in this section are still narrated, not computed.
+2. Re-run the three unlit redleft trials with the room light on, so the redleft
+   estimate rests on eight matched-lighting trials rather than five, and decide
+   whether illumination is fixed by protocol or covered by recorded data.
+3. Sample z from the prior at inference on the merged checkpoint and check
+   whether rollouts become bimodal. This separates "the latent absorbed the
+   mode" from "the decoder never learned the visual cue" and is the cheapest
+   remaining experiment.
+4. Collect placement-focused redleft episodes with a genuine spread of cube
+   start positions, since the current set is close to a single configuration.
+   Do not merge them with the earlier layout.
+5. Fine-tune SmolVLA on the same redleft episodes and evaluate it under the same
+   physical protocol, giving a head-to-head against ACT on identical data. A
+   policy that samples from the action distribution instead of returning its
+   mean is the principled answer to the multimodality result above.
+6. Re-run the front-camera ablation as a properly paired comparison at n=100,
    with a recovery-aware metric (attempts per grasp, time to first stable grasp)
    rather than teacher-forced error alone.
-4. Commit the teacher-forced summaries and the eval configuration alongside each
+7. Commit the teacher-forced summaries and the eval configuration alongside each
    checkpoint, so a reported number is traceable to the run that produced it.
-5. Compare the verified ACT v2 30/50-episode checkpoints against each other
+8. Compare the verified ACT v2 30/50-episode checkpoints against each other
    and the retained v1 baseline under the same physical protocol.
-6. Decide whether the Diffusion comparison uses non-Jetson inference or a
+9. Decide whether the Diffusion comparison uses non-Jetson inference or a
    separately disclosed asynchronous/smaller deployment experiment.
-7. Record and audit 30 red-on-yellow demonstrations.
-8. Run the SmolVLA LoRA resource smoke test, then the declared full training
-   and typed-prompt evaluation.
-9. Publish immutable dataset/model revisions and raw evaluation artifacts
-   before presenting the project as fully reproducible.
+10. Record and audit 30 red-on-yellow demonstrations, then run the SmolVLA LoRA
+    two-task language experiment and typed-prompt evaluation.
+11. Publish immutable dataset/model revisions and raw evaluation artifacts
+    before presenting the project as fully reproducible.

@@ -7,7 +7,7 @@ import unittest
 from _bootstrap import SCRIPTS_DIR
 
 
-SCRIPT = SCRIPTS_DIR / "run_smolvla_language_trial.sh"
+SCRIPT = SCRIPTS_DIR / "smolvla" / "run_smolvla_language_trial.sh"
 
 
 class SmolVlaEvalRunnerTest(unittest.TestCase):

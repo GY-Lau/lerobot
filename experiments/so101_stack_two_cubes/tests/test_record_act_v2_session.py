@@ -11,13 +11,45 @@ from pathlib import Path
 from _bootstrap import SCRIPTS_DIR
 
 import record_act_v2_session as session
+import record_act_camera_pose2_pilot as pose2_session
+import record_act_dual_camera_pilot as dual_session
 
 
-SCRIPT = SCRIPTS_DIR / "record_act_v2_session.py"
+SCRIPT = SCRIPTS_DIR / "common" / "record_act_v2_session.py"
 REPO_ID = Path("GY-William/lerobot_stack_two_cubes_v2")
 
 
 class RecordActV2SessionTest(unittest.TestCase):
+    def test_dual_camera_pilot_has_isolated_dataset_and_camera_mapping(self):
+        protocol = dual_session.DUAL_CAMERA_PROTOCOL
+
+        self.assertEqual(protocol.target_episodes, 20)
+        self.assertEqual(
+            protocol.repo_id,
+            "GY-William/lerobot_stack_two_cubes_dualcam_20ep",
+        )
+        self.assertEqual(protocol.camera_devices, (("wrist", 0), ("front", 2)))
+        self.assertEqual(
+            protocol.pose_check_args,
+            ("--wrist-roll-target", "-79.69"),
+        )
+
+    def test_camera_pose2_pilot_is_isolated_and_has_20_episodes(self):
+        protocol = pose2_session.CAMERA_POSE2_PROTOCOL
+
+        self.assertEqual(protocol.target_episodes, 20)
+        self.assertEqual(
+            protocol.repo_id,
+            "GY-William/lerobot_stack_two_cubes_pose2_20ep",
+        )
+        self.assertNotEqual(protocol.repo_id, session.ACT_V2_PROTOCOL.repo_id)
+        self.assertEqual(
+            protocol.pose_check_args,
+            ("--wrist-roll-target", "-79.69"),
+        )
+        self.assertEqual(session.ACT_V2_PROTOCOL.pose_check_args, ())
+        self.assertEqual(session.ACT_V2_PROTOCOL.camera_devices, (("front", 0),))
+
     def run_script(self, home: Path, *args: str) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env["HF_LEROBOT_HOME"] = str(home)

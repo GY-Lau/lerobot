@@ -15,7 +15,7 @@ from _bootstrap import SCRIPTS_DIR
 from validate_language_position_balance import validate_position_balance
 
 
-PREPARE = SCRIPTS_DIR / "prepare_inverse_language_audit.sh"
+PREPARE = SCRIPTS_DIR / "smolvla" / "prepare_inverse_language_audit.sh"
 
 
 class LanguagePositionBalanceTest(unittest.TestCase):

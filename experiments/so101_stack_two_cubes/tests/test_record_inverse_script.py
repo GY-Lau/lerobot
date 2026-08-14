@@ -10,8 +10,8 @@ from pathlib import Path
 
 from _bootstrap import SCRIPTS_DIR
 
-SCRIPT = SCRIPTS_DIR / "record_inverse_language_data.sh"
-SESSION = SCRIPTS_DIR / "record_inverse_language_session.py"
+SCRIPT = SCRIPTS_DIR / "smolvla" / "record_inverse_language_data.sh"
+SESSION = SCRIPTS_DIR / "smolvla" / "record_inverse_language_session.py"
 REPO_ID = Path("GY-William/lerobot_stack_red_on_yellow")
 
 

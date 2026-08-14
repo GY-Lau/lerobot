@@ -15,8 +15,8 @@ from _bootstrap import SCRIPTS_DIR
 from validate_language_dataset import validate_dataset
 
 
-PREPARE = SCRIPTS_DIR / "prepare_language_dataset.sh"
-TRAIN = SCRIPTS_DIR / "train_smolvla_peft.sh"
+PREPARE = SCRIPTS_DIR / "smolvla" / "prepare_language_dataset.sh"
+TRAIN = SCRIPTS_DIR / "smolvla" / "train_smolvla_peft.sh"
 
 
 class LanguageDatasetValidationTest(unittest.TestCase):

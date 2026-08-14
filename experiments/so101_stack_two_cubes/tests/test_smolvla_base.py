@@ -13,7 +13,7 @@ from _bootstrap import SCRIPTS_DIR
 from verify_smolvla_base import validate_snapshot
 
 
-PREPARE = SCRIPTS_DIR / "prepare_smolvla_base.sh"
+PREPARE = SCRIPTS_DIR / "smolvla" / "prepare_smolvla_base.sh"
 
 
 class SmolVlaBaseTest(unittest.TestCase):
