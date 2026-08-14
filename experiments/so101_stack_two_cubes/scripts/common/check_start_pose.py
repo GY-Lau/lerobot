@@ -91,7 +91,7 @@ TOLERANCE_PROFILES = {
         "elbow_flex.pos": 1.5,
         "wrist_flex.pos": 12.0,
         "wrist_roll.pos": 8.0,
-        "gripper.pos": 1.0,
+        "gripper.pos": 3.0,
     },
 }
 

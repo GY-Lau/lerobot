@@ -147,13 +147,39 @@ if (( ${#policy_ensemble_args[@]} > 0 )); then
   record_cmd+=("${policy_ensemble_args[@]}")
 fi
 
+# An interrupted run (Ctrl-C before the first episode is written) leaves a
+# dataset skeleton with meta/info.json but no tasks.parquet. That stub holds no
+# recorded data and is safe to clear, so aborting a trial does not burn the
+# RUN_ID. Anything that already contains a parquet or mp4 may hold real episodes
+# and is never touched.
+eval_dataset_is_empty_stub() {
+  local root="$1"
+  if [[ -d "$root/data" || -d "$root/videos" ]]; then
+    return 1
+  fi
+  if [[ -n "$(find "$root" -type f \( -name '*.parquet' -o -name '*.mp4' \) -print -quit)" ]]; then
+    return 1
+  fi
+  return 0
+}
+
 if [[ -f "$dataset_root/meta/info.json" ]]; then
   if [[ ! -f "$dataset_root/meta/tasks.parquet" ]]; then
-    echo "Existing evaluation dataset is incomplete: $dataset_root" >&2
-    echo "Use a new RUN_ID; this script will not delete the incomplete directory." >&2
-    exit 1
+    if eval_dataset_is_empty_stub "$dataset_root"; then
+      if "$dry_run"; then
+        echo "would clear empty dataset stub left by an interrupted run: $dataset_root"
+      else
+        echo "Clearing empty dataset stub left by an interrupted run: $dataset_root"
+        rm -rf -- "$dataset_root"
+      fi
+    else
+      echo "Existing evaluation dataset is incomplete but not empty: $dataset_root" >&2
+      echo "Use a new RUN_ID; this script will not delete data it did not verify as empty." >&2
+      exit 1
+    fi
+  else
+    record_cmd+=(--resume=true)
   fi
-  record_cmd+=(--resume=true)
 elif [[ -e "$dataset_root" ]]; then
   echo "Dataset path exists but has no complete metadata: $dataset_root" >&2
   echo "Use a new RUN_ID; this script will not delete the existing path." >&2
