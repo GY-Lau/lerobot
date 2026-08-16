@@ -7,7 +7,7 @@ from pathlib import Path
 
 EXPERIMENT_DIR = Path(__file__).resolve().parents[1]
 EXPECTED_DIRS = {"assets", "docs", "manifests", "results", "scripts", "tests"}
-ALLOWED_ROOT_FILES = {"README.md", "PROJECT_REPORT.md"}
+ALLOWED_ROOT_FILES = {"README.md", "PROJECT_REPORT.md", "PROJECT_REPORT.zh-CN.md"}
 
 
 class ExperimentLayoutTest(unittest.TestCase):

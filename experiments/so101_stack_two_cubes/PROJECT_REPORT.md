@@ -10,6 +10,67 @@ This is a work-in-progress evidence report. It separates completed engineering
 results from experiments that still require physical trials; a trained
 checkpoint is not presented as proof of task success.
 
+## Findings
+
+Six results, each with the number that supports it and the limit that qualifies
+it. The rest of this report is the evidence behind them.
+
+**1. Observability is a property of the whole rig, not of the camera.** The
+recurring failure was never the policy forgetting the task; it was missing
+centimetre precision at exactly two moments, final descent and release. Camera
+pose, **gripper orientation**, and **object layout** each changed what the policy
+could see at those moments. Re-orienting the gripper for a second camera turned
+the wrist view top-down and scored **0/6**; standing it vertical and moving the
+red cube laterally so it stays visible during carry reached **2/5**, the project's
+best. Two of the three fixes changed no model code at all.
+
+**2. Open-loop fitting error cannot rank policies for closed-loop deployment.**
+A teacher-forced diagnostic correctly localised the error to grasp and release,
+which is what it is good for. It then ranked wrist-only above wrist+front on
+every metric — and the physically stronger policy was wrist+front, because it
+**recovers**: bump the cube, lift, re-align, grasp on the second attempt (4 of 5
+trials). Teacher forcing scores agreement with an expert who never fails, so it
+cannot see recovery. The checkpoint that fit demonstrations best (1.293 deg)
+scored 0/6.
+
+**3. A deployment parameter dominated every model change attempted.** At the
+inherited `n_action_steps=20` both vertical checkpoints scored 0 — not imprecise,
+**stalled**, re-executing the opening fragment of each fresh 100-step chunk and
+never reaching its descend-and-close tail. Setting it to 100, same weights,
+moved grasping from **0/5 to 4/5**. For weeks a deployment artifact was
+indistinguishable from "the policy cannot grasp".
+
+**4. More data is not automatically better; merges need a distribution check.**
+Adding 20 episodes whose red-cube positions did not overlap the evaluation layout
+moved the policy from **2/5 to 0/6**, and it failed in a new way: releasing short
+of the cube rather than at its edge. The mechanism is measured twice
+independently — zero overlap on the red cube's image v-axis predicts a release
+21 px short, and a release-phase **bias ratio of 0.92** (against 0.09 in the
+control) rules out underfitting in favour of a systematic directional offset.
+Caveat: 2/5 versus 0/6 is Fisher p ≈ 0.18, so the claim rests on the two
+mechanism measurements agreeing, not on the trial counts.
+
+**5. ACT's CVAE is posterior-collapsed here; it is a plain regressor.** The
+appealing explanation for #4 — the latent absorbed the target choice and
+inference-time zeroing discards it — was testable, so it was tested. Sampling z
+from the prior 32 times beats `z = 0` by **0.6%**, and per-joint spread across
+draws is **under 0.04 deg** against errors of 2 to 7 deg. At `kl_weight = 10.0`
+on 20-40 episodes the latent carries nothing. So the averaging happens in the
+decoder, which never learned to read the target from pixels — leaving exactly two
+levers: make the target observable, or use a policy class that **samples** from
+the action distribution instead of returning its mean.
+
+**6. Evaluation conditions are part of the experiment.** The demonstrations were
+recorded at night with the room light on. Three trials run the next morning with
+the light off completed **0/3** grasps; lit, the same checkpoint completed
+**5/5**. That is the largest single-factor effect measured anywhere in this
+project, and it came from a variable nobody was controlling. The pre-trial gates
+check that both cubes are visible; they do not check illumination.
+
+What none of this establishes yet is in
+[Claims not yet supported](#claims-not-yet-supported) — every headline here rests
+on 5 to 8 physical trials with overlapping intervals.
+
 ## System and task
 
 | Component | Configuration |
@@ -271,10 +332,6 @@ drive frequent re-planning, so short chunks produce hesitation loops. The
 deployment configuration is therefore locked at **`n_action_steps=100`, temporal
 ensembling off**.
 
-This was the single highest-leverage change in the project, and it changed no
-weights. It is worth separating clearly from model quality: for several weeks a
-deployment-parameter artifact was indistinguishable from "the policy cannot
-grasp."
 
 ### Why the open-loop metric was misleading
 
@@ -337,11 +394,8 @@ three arm-A trials ran the next morning in daylight with the light **off**, and
 the policy **never completed a grasp in any of them (0/3)**. With the light on it
 completed a grasp in **5/5**.
 
-That is the largest single-factor effect measured anywhere in this project, and
-it came from a variable nobody was controlling. The pre-trial gates check that
-both cubes are visible; they do not check illumination. The three unlit trials
-are reported separately above rather than dropped, and the matched-lighting rows
-carry the smaller n that honesty requires.
+The three unlit trials are reported separately above rather than dropped, and
+the matched-lighting rows carry the smaller n that honesty requires (finding #6).
 
 ### Adding data made it worse, and the mechanism is measurable
 
@@ -476,28 +530,6 @@ the remaining placement failures still call for. Or use a policy class that
 **samples** from the action distribution instead of returning its mean — diffusion,
 or the flow matching used by SmolVLA — which removes the failure by construction.
 The second is the motivation for the SmolVLA comparison on this same data.
-
-### What this chain establishes
-
-- The failure was observability, and observability is a property of the whole
-  rig: camera pose, gripper orientation, **and object layout** all change what the
-  policy can see. Two of the three fixes required no model change at all.
-- Open-loop fitting metrics are cheap and locally informative — they correctly
-  localized the error to grasp and release — but they **cannot rank policies for
-  closed-loop deployment**, because they cannot measure recovery. Here they gave a
-  confidently wrong ranking.
-- Execution parameters can dominate model quality. `n_action_steps` alone
-  separated 0/5 from 4/5 grasping on identical weights.
-- **More data is not automatically better.** Twenty additional episodes whose
-  target distribution did not overlap the evaluation layout moved the policy from
-  2/5 to 0/6. Dataset merges need a distribution check, not just an episode count.
-- Averaging is the recurring adversary, and it enters at three separate levels —
-  data curation, the CVAE latent at inference, and chunk re-planning. Diagnosing
-  it needs **signed** error, not MAE: the two hypotheses differ in the sign
-  structure of the residual, not its magnitude.
-- Evaluation conditions are part of the experiment. An uncontrolled lighting
-  change produced a larger effect (5/5 versus 0/3 grasping) than any model
-  intervention attempted here.
 
 ## ACT versus Diffusion on Jetson
 
@@ -691,7 +723,8 @@ hashes before the publication status is changed from `local_only`.
 | SmolVLA language adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
-Claims not yet supported:
+### Claims not yet supported
+
 
 - that 10, 20, or 30 demonstrations has the best reportable physical success rate;
 - that ACT outperforms Diffusion in task success;
@@ -724,38 +757,32 @@ Claims not yet supported:
 
 ## Next evidence gates
 
-1. Backfill the remaining physical trials into `trials.csv`. The 14 red-left
-   generation trials (8 redleft, 6 combined) are now logged with the failure
-   taxonomy, and `summarize_trials.py` reproduces the rates and Wilson intervals
-   quoted above from the file rather than from narration. Still outstanding: the
-   0/6 dualcam outcomes and the vertical `n=20`/`n=100` trials, which remain
-   narrated only. Note also that the summariser groups by `run_id` and knows
-   nothing about illumination, so the matched-lighting 2/5 still has to be
-   separated by hand from the three unlit trials recorded in the notes column.
-2. Re-run the three unlit redleft trials with the room light on, so the redleft
-   estimate rests on eight matched-lighting trials rather than five, and decide
-   whether illumination is fixed by protocol or covered by recorded data.
-3. Done: the prior-sampling probe showed the latent is inert, which removes the
-   architectural explanation and leaves observability and policy class as the
-   only levers. Optional follow-up, low priority: retrain with a lower
-   `kl_weight` to see whether a non-collapsed latent behaves differently.
-4. Collect placement-focused redleft episodes with a genuine spread of cube
-   start positions, since the current set is close to a single configuration.
-   Do not merge them with the earlier layout.
-5. Fine-tune SmolVLA on the same redleft episodes and evaluate it under the same
-   physical protocol, giving a head-to-head against ACT on identical data. A
-   policy that samples from the action distribution instead of returning its
-   mean is the principled answer to the multimodality result above.
-6. Re-run the front-camera ablation as a properly paired comparison at n=100,
-   with a recovery-aware metric (attempts per grasp, time to first stable grasp)
-   rather than teacher-forced error alone.
-7. Commit the teacher-forced summaries and the eval configuration alongside each
-   checkpoint, so a reported number is traceable to the run that produced it.
-8. Compare the verified ACT v2 30/50-episode checkpoints against each other
-   and the retained v1 baseline under the same physical protocol.
-9. Decide whether the Diffusion comparison uses non-Jetson inference or a
-   separately disclosed asynchronous/smaller deployment experiment.
-10. Record and audit 30 red-on-yellow demonstrations, then run the SmolVLA LoRA
-    two-task language experiment and typed-prompt evaluation.
-11. Publish immutable dataset/model revisions and raw evaluation artifacts
-    before presenting the project as fully reproducible.
+Ordered by what would change a conclusion, not by effort.
+
+1. **Get the physical numbers out of narration.** The 14 red-left trials are in
+   `trials.csv` and `summarize_trials.py` reproduces their rates and intervals
+   from the file. The 0/6 dualcam outcomes and the vertical `n=20`/`n=100` trials
+   are still narrated only. The summariser also groups by `run_id` and knows
+   nothing about illumination, so the matched-lighting 2/5 is still separated by
+   hand.
+2. **Re-run the three unlit red-left trials with the light on**, taking that
+   estimate from five matched-lighting trials to eight, and decide whether
+   illumination is fixed by protocol or covered by recorded data.
+3. **Collect placement-focused red-left episodes with a real spread of start
+   positions.** The current set sits within about 6 px of one configuration, so
+   its 5/5 grasp rate says nothing about spatial generalisation. Do not merge
+   them with the earlier layout.
+4. **Finish the SmolVLA comparison**: measure Jetson inference latency *before*
+   physical trials, then run the same protocol as ACT. A policy that samples from
+   the action distribution is the principled answer to finding #5, and the
+   Diffusion section shows what happens when latency is checked afterwards.
+5. **Re-run the front-camera ablation properly paired at n=100**, scored with a
+   recovery-aware metric — attempts per grasp, time to first stable grasp —
+   rather than teacher-forced error, which finding #2 showed ranks it backwards.
+
+Deferred, and why: ACT v2 30/50 physical comparison and the Diffusion deployment
+decision are both waiting on robot time that the items above use better; the
+two-order language experiment needs 30 new demonstrations; a lower-`kl_weight`
+retrain would be interesting but the latent being inert already settles the
+question it was asked. Publishing immutable dataset and model revisions is a
+release step, not an evidence step.
