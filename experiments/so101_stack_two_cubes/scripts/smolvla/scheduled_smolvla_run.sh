@@ -19,6 +19,8 @@
 #         SMOLVLA_STEPS          optimizer steps for the full run(default 30000)
 #         SMOLVLA_BATCH_SIZE     batch size                      (default 8)
 #         SMOLVLA_FINETUNE_MODE  expert_only (published recipe) or lora
+#         SMOLVLA_DATASET        dataset name under GY-William/
+#         SMOLVLA_MIN_EPISODES   episodes the dataset gate requires (default 20)
 
 set -uo pipefail
 
@@ -83,12 +85,16 @@ export LEROBOT_PYTHON="$ws/venvs/lerobot-a4500-py310/bin/python"
 export SMOLVLA_BASE_MODEL="$ws/models/lerobot_smolvla_base_c83c316"
 export SMOLVLA_BACKBONE_MODEL="$ws/models/smolvlm2_500m_processor_7b375e1"
 export SMOLVLA_BASE_MANIFEST="$repo/experiments/so101_stack_two_cubes/manifests/smolvla_base.json"
-export LANGUAGE_DATASET_REPO=GY-William/lerobot_stack_two_cubes_vertical_redleft_20ep
-export LANGUAGE_DATASET_ROOT="$ws/datasets/GY-William/lerobot_stack_two_cubes_vertical_redleft_20ep"
 # Single-task dataset: this is the ACT-matched data comparison, not the
-# two-order language experiment the gate defaults to.
+# two-order language experiment the gate defaults to. Overridable so the same
+# launcher covers both arms of that comparison — red-left alone, which is close
+# to one target layout, and the merged 40 where the two layouts do not overlap
+# and ACT averaged between them.
+smolvla_dataset="${SMOLVLA_DATASET:-lerobot_stack_two_cubes_vertical_redleft_20ep}"
+export LANGUAGE_DATASET_REPO="GY-William/$smolvla_dataset"
+export LANGUAGE_DATASET_ROOT="$ws/datasets/GY-William/$smolvla_dataset"
 export SMOLVLA_MIN_TASKS=1
-export SMOLVLA_MIN_EPISODES_PER_TASK=20
+export SMOLVLA_MIN_EPISODES_PER_TASK="${SMOLVLA_MIN_EPISODES:-20}"
 export SMOLVLA_EXPECTED_TASKS="Stack the yellow cube on top of the red cube"
 export LEROBOT_NUM_WORKERS="${LEROBOT_NUM_WORKERS:-8}"
 export CUDA_VISIBLE_DEVICES="$gpu"
