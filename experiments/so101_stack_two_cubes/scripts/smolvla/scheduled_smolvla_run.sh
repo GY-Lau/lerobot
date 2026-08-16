@@ -85,6 +85,14 @@ export SMOLVLA_EXPECTED_TASKS="Stack the yellow cube on top of the red cube"
 export LEROBOT_NUM_WORKERS="${LEROBOT_NUM_WORKERS:-8}"
 export CUDA_VISIBLE_DEVICES="$gpu"
 export PYTHONNOUSERSITE=1
+# --policy.vlm_model_name redirects the backbone weights, but the base
+# checkpoint's policy_preprocessor.json carries its own hardcoded
+# "tokenizer_name": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct" -- a Hub id,
+# not a path. This host cannot reach huggingface.co, so that lookup has to be
+# served from the local hub cache. Downloading with local_dir= does NOT populate
+# that cache, which is why the first scheduled attempt died here. Fail loudly
+# rather than hang on a DNS timeout if the cache is ever missing.
+export HF_HUB_OFFLINE=1
 
 # --- gate 3: the pinned base checkpoint is intact ----------------------------
 say "verifying pinned SmolVLA base"
