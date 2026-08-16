@@ -28,6 +28,30 @@ placements, and 11/30 start frames with at least one ambiguous or missing
 color-based placement detection. These limitations are part of the result,
 not silently cleaned after training.
 
+### Where the hyperparameters come from
+
+Every ACT run in this report uses LeRobot's ACT defaults, which are the paper's
+values. The training scripts pass `--policy.type`, `--policy.device`,
+`--policy.use_amp=false` and `--policy.push_to_hub=false` and **override no
+policy hyperparameter at all**: learning rate 1e-5 for both the transformer and
+the ResNet18 backbone, weight decay 1e-4, `kl_weight` 10.0, `latent_dim` 32,
+`chunk_size` and `n_action_steps` 100, dropout 0.1, ImageNet-pretrained backbone.
+Reported differences between ACT runs therefore come from data, camera set, or
+deployment settings, never from a quietly retuned optimizer.
+
+One deliberate deviation: LeRobot's default is **100,000** optimizer steps and
+this project fixes every run at **30,000**, batch size 8, seed 1000, AMP off. At
+batch 8 that is about 20 passes over a 20-episode dataset rather than 67. The
+choice predates this report — a 60k run raised overfitting concerns — and it is
+held constant across every ACT comparison, but it is a departure from the
+published recipe and any absolute ACT number here should be read with it in mind.
+
+The SmolVLA comparison is run the same way: the released checkpoint's own config,
+no hyperparameter overrides. Its `scheduler_decay_steps` is 30,000 and LeRobot's
+default batch size is 8, so the two policies end up matched on optimizer steps,
+batch size, seed, and data exposure **without either being bent to fit the
+other**. That coincidence is convenient, not engineered.
+
 ## Evidence matrix
 
 | Workstream | Verified evidence | Current status | Missing gate |
@@ -45,7 +69,8 @@ not silently cleaned after training.
 | Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
-| SmolVLA PEFT | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
+| SmolVLA vs ACT (single task) | Same red-left 20 episodes, same batch/steps/seed, each side on its own published hyperparameters | Training running on the A4500 under the released recipe | Jetson latency measurement, then physical trials under the ACT protocol |
+| SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
 | Voice control | Text-first evaluation matrix and ASR error-separation design | Designed only | Requires a language-grounded model that first passes typed prompts |
 
 ## ACT data-efficiency experiment
@@ -198,6 +223,17 @@ crosses a different recording session and is shown for orientation. Wrist-only
 fit better on **every** row, and by the widest margin at release (1.424 vs 2.237,
 36 percent lower). It also trained about **65 percent faster** (4.0 vs 2.44
 steps/s), since one fewer video stream is decoded per sample.
+
+That speed gap turned out to be an artifact worth naming, because it says
+nothing about the models. Every training script here inherited
+`--num_workers=0`, so video decoding ran inside the training process, serialised
+with the forward and backward pass — on a host with 40 cores, one of which was
+used. The wrist+front run was not a heavier model, it was decoding one more
+stream on the critical path. Raising the setting moves data loading off that
+path entirely: a later SmolVLA run on the same host logs `data_s` of 0.002 to
+0.024 s against `updt_s` of 0.16 to 0.27 s, and GPU utilisation rises from 23 to
+86 percent. The default is now `LEROBOT_NUM_WORKERS`, still 0, so every
+checkpoint already trained stays reproducible; new runs should set it.
 
 Read alone, this says the fixed front camera is a distractor rather than an
 information source. The physical trials then showed that reading is wrong, for a
@@ -485,6 +521,49 @@ current architecture and synchronous controller. Reducing denoising steps
 improves latency but changes the policy computation and degraded the observed
 motion.
 
+## SmolVLA versus ACT on identical data
+
+The multimodality result above leaves two levers: make the target observable, or
+use a policy class that samples from the action distribution instead of returning
+its mean. SmolVLA's flow-matching head is the second lever, and testing it needs
+no new data — the red-left 20 episodes already exist.
+
+This run is deliberately **not** the language experiment below. It is a single
+task, the same 20 episodes ACT was trained and evaluated on, so the only thing
+that changes is the policy.
+
+| | ACT | SmolVLA |
+| --- | --- | --- |
+| Data | redleft 20 episodes / 11,960 frames | same |
+| Method | full fine-tune (ACT trains from scratch) | `freeze_vision_encoder` + `train_expert_only`, the released config's own setting |
+| Batch x steps | 8 x 30,000 | 8 x 30,000 |
+| Seed | 1000 | 1000 |
+| Hyperparameters | LeRobot/paper defaults, no overrides | released checkpoint config, no overrides |
+
+Getting there required two corrections worth recording, because both would
+silently produce a misleading comparison rather than an error:
+
+- The project's SmolVLA launcher had been written around LoRA and hard-overrode
+  the published optimizer settings — learning rate 1e-3 against the checkpoint's
+  1e-4, decay 1e-4 against 2.5e-6. Those suit an adapter, not this. SmolVLA is
+  already parameter-efficient by its own config, which freezes the vision encoder
+  and trains only the action expert, so the adapter was redundant as well.
+- The released checkpoint's `policy_preprocessor.json` hardcodes `tokenizer_name`
+  as a **Hub id**, which `--policy.vlm_model_name` does not override. On a host
+  with no route to huggingface.co that lookup can only be served from the local
+  hub cache, and downloading the backbone with `local_dir=` does not populate it.
+  The first scheduled run died here. The processor now lives in the hub cache
+  with `refs/main` pinned to the same verified revision.
+
+The first scheduled attempt aborted in its smoke stage and never started the full
+run, which is what that gate is for.
+
+Physical evaluation will use the same protocol as ACT: the pose and wrist-view
+gates, `n_action_steps` at the value locked above, room light on. **Jetson
+inference latency has to be measured before those trials, not after** — the
+Diffusion Policy comparison in this report was confounded exactly that way, and
+SmolVLA is a ~450M-parameter model with a VLM backbone on an Orin NX.
+
 ## SmolVLA language-control experiment
 
 The curated ACT v2 dataset has one instruction and one behavior. Relabeling the
@@ -644,11 +723,14 @@ Claims not yet supported:
 
 ## Next evidence gates
 
-1. Normalize every dual-camera-generation physical trial into `trials.csv` with
-   the existing failure taxonomy, so success rates and intervals are computed
-   from data rather than narrated. This now covers 14 further trials (8 redleft,
-   6 combined) plus the 0/6 dualcam backfill. This is the live gate: the
-   headline numbers in this section are still narrated, not computed.
+1. Backfill the remaining physical trials into `trials.csv`. The 14 red-left
+   generation trials (8 redleft, 6 combined) are now logged with the failure
+   taxonomy, and `summarize_trials.py` reproduces the rates and Wilson intervals
+   quoted above from the file rather than from narration. Still outstanding: the
+   0/6 dualcam outcomes and the vertical `n=20`/`n=100` trials, which remain
+   narrated only. Note also that the summariser groups by `run_id` and knows
+   nothing about illumination, so the matched-lighting 2/5 still has to be
+   separated by hand from the three unlit trials recorded in the notes column.
 2. Re-run the three unlit redleft trials with the room light on, so the redleft
    estimate rests on eight matched-lighting trials rather than five, and decide
    whether illumination is fixed by protocol or covered by recorded data.
