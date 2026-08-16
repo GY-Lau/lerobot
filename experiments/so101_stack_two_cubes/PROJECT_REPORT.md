@@ -592,7 +592,7 @@ isolates policy grounding errors from ASR errors.
 Verify the ACT checkpoints:
 
 ```bash
-python experiments/so101_stack_two_cubes/scripts/verify_act_checkpoint.py \
+python experiments/so101_stack_two_cubes/scripts/act/verify_act_checkpoint.py \
   outputs/train/act_stack_two_cubes_10ep_30k/checkpoints/030000 \
   --episode-count=10
 ```
@@ -600,14 +600,14 @@ python experiments/so101_stack_two_cubes/scripts/verify_act_checkpoint.py \
 Preview a physical data-efficiency trial without moving the robot:
 
 ```bash
-bash experiments/so101_stack_two_cubes/scripts/run_act_data_efficiency_trial.sh \
+bash experiments/so101_stack_two_cubes/scripts/act/run_act_data_efficiency_trial.sh \
   --dry-run 10 false
 ```
 
 Measure per-phase, per-joint teacher-forced action error for any checkpoint:
 
 ```bash
-python experiments/so101_stack_two_cubes/scripts/diagnose_teacher_forced_action_error.py \
+python experiments/so101_stack_two_cubes/scripts/act/diagnose_teacher_forced_action_error.py \
   outputs/train/act_stack_two_cubes_vertical_20ep_b8_30k_seed1000/checkpoints/030000
 ```
 
@@ -615,25 +615,25 @@ Check the wrist-camera start-scene gate without recording (both cubes must be
 fully in frame):
 
 ```bash
-python experiments/so101_stack_two_cubes/scripts/check_wrist_cube_view.py --camera-index 0
+python experiments/so101_stack_two_cubes/scripts/common/check_wrist_cube_view.py --camera-index 0
 ```
 
 Preview a vertical physical trial at the locked deployment configuration:
 
 ```bash
-bash experiments/so101_stack_two_cubes/scripts/run_act_vertical_trial.sh wristfront eval_demo 100
+bash experiments/so101_stack_two_cubes/scripts/act/run_act_vertical_trial.sh wristfront eval_demo 100
 ```
 
 Rebuild the combined 40-episode dataset from its two inputs:
 
 ```bash
-python experiments/so101_stack_two_cubes/scripts/merge_two_datasets.py --help
+python experiments/so101_stack_two_cubes/scripts/common/merge_two_datasets.py --help
 ```
 
 Recompute one Diffusion latency summary from its raw log:
 
 ```bash
-python experiments/so101_stack_two_cubes/scripts/summarize_latency.py \
+python experiments/so101_stack_two_cubes/scripts/common/summarize_latency.py \
   outputs/eval_latency/eval_diffusion_30k_n5_amp_fixed_30s.csv \
   --include-warmup
 ```
@@ -686,8 +686,9 @@ hashes before the publication status is changed from `local_only`.
 | Vertical physical trials (n=20, n=100, ensembling, n=50) | Recorded eval episodes on the Jetson; outcomes narrated per trial | Reported here; not yet normalized into `trials.csv` |
 | Red-left 20ep dataset | Jetson cache; transferred to A4500 and load-verified | Collection complete; Hub publication pending |
 | Combined 40ep dataset | A4500 `datasets/..._vertical_combined_40ep`, 40 eps / 23,920 frames | Built by `merge_two_datasets.py`; load-verified |
-| Red-left A/B checkpoints | A4500 `outputs/train/act_stack_two_cubes_{redleft_20ep,combined_40ep}_b8_30k_seed1000` | Training in progress |
-| SmolVLA adapter | Not created | Blocked on real inverse-task demonstrations |
+| Red-left A/B checkpoints | A4500 `outputs/train/act_stack_two_cubes_{redleft_20ep,combined_40ep}_b8_30k_seed1000` | Both trained to 30k and physically evaluated; 14 trials logged to `trials.csv` |
+| SmolVLA single-task fine-tune | A4500 `outputs/train/smolvla_expert_redleft_20ep_b8_30k` | Training under the released recipe; pinned base verified by sha256 |
+| SmolVLA language adapter | Not created | Blocked on real inverse-task demonstrations |
 | Source and protocols | Git branch `jetson-py310` | Version controlled and tested |
 
 Claims not yet supported:
