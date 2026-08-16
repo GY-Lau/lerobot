@@ -76,11 +76,17 @@ fi
 
 export PYTHONNOUSERSITE=1
 
-# Dataloader workers. Defaults to 0 so every checkpoint trained so far stays
-# reproducible; video decode is otherwise serialised with the training step and
-# becomes the bottleneck on multi-camera datasets. Raise it via the environment
-# (about half the cores: 8 on the A4500 host, 4 on the Jetson).
-num_workers="${LEROBOT_NUM_WORKERS:-0}"
+# Dataloader workers. With 0 the video decode runs inside the training process,
+# serialised with the forward and backward pass, and it dominates: a measured A/B
+# on this dataset (ACT, batch 8, 150 steps, same seed) gave 2.51 step/s at 0
+# against 6.68 at 8, with data_s falling 0.256 -> 0.004 s while updt_s held at
+# 0.142 -> 0.150. Logged loss matched at every step, so this changes throughput
+# and not the training itself. Defaults to half the cores, capped at 8: 8 on the
+# 40-core A4500 host, 4 on the Jetson.
+_default_workers=$(( $(nproc 2>/dev/null || echo 4) / 2 ))
+(( _default_workers > 8 )) && _default_workers=8
+(( _default_workers < 1 )) && _default_workers=1
+num_workers="${LEROBOT_NUM_WORKERS:-$_default_workers}"
 
 train_cmd=(
   "$train_bin"

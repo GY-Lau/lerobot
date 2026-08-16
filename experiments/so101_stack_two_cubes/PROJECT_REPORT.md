@@ -290,11 +290,31 @@ nothing about the models. Every training script here inherited
 `--num_workers=0`, so video decoding ran inside the training process, serialised
 with the forward and backward pass — on a host with 40 cores, one of which was
 used. The wrist+front run was not a heavier model, it was decoding one more
-stream on the critical path. Raising the setting moves data loading off that
-path entirely: a later SmolVLA run on the same host logs `data_s` of 0.002 to
-0.024 s against `updt_s` of 0.16 to 0.27 s, and GPU utilisation rises from 23 to
-86 percent. The default is now `LEROBOT_NUM_WORKERS`, still 0, so every
-checkpoint already trained stays reproducible; new runs should set it.
+stream on the critical path. The training logs show how large that cost was:
+`data_s` was **0.275 s against an `updt_s` of 0.185** on the red-left run and
+0.375 against 0.143 on the merged one, so **60 to 72 percent of each step was
+spent waiting for data**.
+
+A direct A/B settles it. Same dataset, same ACT recipe, same seed, batch 8, 150
+steps, one idle GPU:
+
+| | `num_workers=0` | `num_workers=8` |
+| --- | ---: | ---: |
+| Throughput | 2.51 step/s | **6.68 step/s** |
+| `updt_s` (compute) | 0.142 | 0.150 |
+| `data_s` (loading) | **0.256** | **0.004** |
+| Logged loss at step 50 / 100 | 14.338 / 5.049 | 14.338 / 5.049 |
+
+**2.66x faster, with the compute time unchanged** — the entire gain is `data_s`
+falling by a factor of 64. A 30k-step ACT run goes from about 3.3 hours to about
+1.25 hours.
+
+The identical logged loss matters as much as the speed: sample order is fixed by
+the seed, not by the worker count, so this changes throughput and **not the
+training itself**. The setting was initially left at 0 out of a reproducibility
+concern that this measurement shows was unfounded. It now defaults to half the
+host's cores capped at 8 — 8 on the A4500, 4 on the Jetson — and is still
+overridable through `LEROBOT_NUM_WORKERS`.
 
 Read alone, this says the fixed front camera is a distractor rather than an
 information source. The physical trials then showed that reading is wrong, for a
