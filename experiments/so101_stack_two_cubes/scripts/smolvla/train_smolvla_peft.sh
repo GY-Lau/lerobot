@@ -96,6 +96,38 @@ done <<< "$expected_tasks"
 
 export PYTHONNOUSERSITE=1
 
+# Fine-tuning method.
+#
+#   expert_only (default) -- what the released checkpoint's own config asks for:
+#     freeze_vision_encoder and train_expert_only are already true in it, so the
+#     VLM is frozen and only the action expert trains. That is parameter
+#     efficient on its own; stacking LoRA on top is redundant. Optimizer and
+#     scheduler settings are inherited from the checkpoint rather than
+#     overridden, which is the point of following the published recipe.
+#
+#   lora -- adds a LoRA adapter and the higher learning rate that needs. Kept
+#     for the two-order language experiment, which was designed around it.
+#
+# Anything trained one way is not comparable with the other; say which was used.
+finetune_mode="${SMOLVLA_FINETUNE_MODE:-expert_only}"
+case "$finetune_mode" in
+  expert_only) method_args=() ;;
+  lora)
+    method_args=(
+      --policy.optimizer_lr=1e-3
+      --policy.scheduler_decay_lr=1e-4
+      "--policy.scheduler_warmup_steps=$warmup_steps"
+      "--policy.scheduler_decay_steps=$steps"
+      --peft.method_type=LORA
+      "--peft.r=$lora_rank"
+    )
+    ;;
+  *)
+    echo "SMOLVLA_FINETUNE_MODE must be 'expert_only' or 'lora', got '$finetune_mode'." >&2
+    exit 2
+    ;;
+esac
+
 train_cmd=(
   "$accelerate_bin" launch
   "--mixed_precision=$mixed_precision"
@@ -108,14 +140,9 @@ train_cmd=(
   --policy.push_to_hub=false
   "--policy.vlm_model_name=$backbone_model"
   --policy.load_vlm_weights=false
-  --policy.optimizer_lr=1e-3
-  --policy.scheduler_decay_lr=1e-4
-  "--policy.scheduler_warmup_steps=$warmup_steps"
-  "--policy.scheduler_decay_steps=$steps"
+  "${method_args[@]}"
   "--dataset.repo_id=$dataset_repo"
   "--dataset.root=$dataset_root"
-  --peft.method_type=LORA
-  "--peft.r=$lora_rank"
   "--output_dir=$output_dir"
   "--job_name=$run_name"
   "--batch_size=$batch_size"

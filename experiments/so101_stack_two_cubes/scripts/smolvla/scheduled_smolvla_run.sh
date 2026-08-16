@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unattended SmolVLA LoRA run for the shared A4500 host.
+# Unattended SmolVLA fine-tune for the shared A4500 host.
 #
 # The box is shared and its disk runs close to full, so this refuses to start
 # rather than degrade someone else's job or fill the filesystem. It also proves
@@ -16,7 +16,9 @@
 #         SMOLVLA_MAX_GPU_UTIL   GPU utilisation allowed         (default 25)
 #         SMOLVLA_MIN_DISK_GB    filesystem headroom required    (default 20)
 #         SMOLVLA_WAIT_MINUTES   how long to keep retrying       (default 360)
-#         SMOLVLA_STEPS          optimizer steps for the full run(default 20000)
+#         SMOLVLA_STEPS          optimizer steps for the full run(default 30000)
+#         SMOLVLA_BATCH_SIZE     batch size                      (default 8)
+#         SMOLVLA_FINETUNE_MODE  expert_only (published recipe) or lora
 
 set -uo pipefail
 
@@ -26,12 +28,18 @@ if [[ "${1:-}" == "--check-only" ]]; then
   shift
 fi
 
-run_name="${1:-smolvla_lora_redleft_20ep_r16_20k}"
+# Defaults follow SmolVLA's published recipe: the checkpoint's own config sets
+# scheduler_decay_steps to 30000, and LeRobot's training default batch size is 8.
+# Those happen to be the ACT contract on this project too (batch 8, 30k updates,
+# seed 1000), so the comparison is matched on data exposure without either side
+# being bent to fit the other.
+run_name="${1:-smolvla_expert_redleft_20ep_b8_30k}"
+batch_size="${SMOLVLA_BATCH_SIZE:-8}"
 min_free_mib="${SMOLVLA_MIN_FREE_MIB:-14000}"
 max_util="${SMOLVLA_MAX_GPU_UTIL:-25}"
 min_disk_gb="${SMOLVLA_MIN_DISK_GB:-20}"
 wait_minutes="${SMOLVLA_WAIT_MINUTES:-360}"
-steps="${SMOLVLA_STEPS:-20000}"
+steps="${SMOLVLA_STEPS:-30000}"
 
 ws=/home/ebots/guangyi_test_ws
 repo="$ws/lerobot"
@@ -103,7 +111,7 @@ say "verifying pinned SmolVLA base"
 
 if "$check_only"; then
   say "check-only: resolved training command follows, nothing was started"
-  bash "$script_dir/train_smolvla_peft.sh" --dry-run "$run_name" "$steps" 1 16 5000 bf16 2>&1 | tee -a "$log"
+  bash "$script_dir/train_smolvla_peft.sh" --dry-run "$run_name" "$steps" "$batch_size" 16 5000 bf16 2>&1 | tee -a "$log"
   exit 0
 fi
 
@@ -111,7 +119,7 @@ fi
 smoke="${run_name}_smoke"
 rm -rf "$repo/outputs/train/$smoke"
 say "smoke run: 20 steps"
-if ! bash "$script_dir/train_smolvla_peft.sh" "$smoke" 20 1 16 20 bf16 >>"$log" 2>&1; then
+if ! bash "$script_dir/train_smolvla_peft.sh" "$smoke" 20 "$batch_size" 16 20 bf16 >>"$log" 2>&1; then
   abort "smoke run failed; full run not started (see $log)"
 fi
 [[ -d "$repo/outputs/train/$smoke/checkpoints" ]] || abort "smoke run wrote no checkpoint"
@@ -120,7 +128,7 @@ rm -rf "$repo/outputs/train/$smoke"
 
 # --- full run ----------------------------------------------------------------
 say "starting full run: $steps steps on GPU $gpu"
-bash "$script_dir/train_smolvla_peft.sh" "$run_name" "$steps" 1 16 5000 bf16 >>"$log" 2>&1
+bash "$script_dir/train_smolvla_peft.sh" "$run_name" "$steps" "$batch_size" 16 5000 bf16 >>"$log" 2>&1
 status=$?
 if (( status == 0 )); then
   say "DONE: $repo/outputs/train/$run_name"
