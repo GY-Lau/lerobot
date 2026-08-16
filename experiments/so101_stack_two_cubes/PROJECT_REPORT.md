@@ -130,7 +130,7 @@ other**. That coincidence is convenient, not engineered.
 | Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
-| SmolVLA vs ACT (single task) | Same red-left 20 episodes, same batch/steps/seed, each side on its own published hyperparameters | Training running on the A4500 under the released recipe | Jetson latency measurement, then physical trials under the ACT protocol |
+| SmolVLA vs ACT (single task) | Both arms of a 2x2: red-left 20 and combined 40, same batch/steps/seed as ACT, each side on its own published hyperparameters | Both training on the A4500 under the released recipe | Jetson latency measurement, then physical trials under the ACT protocol. The combined-40 arm is the one that tests the multimodality claim |
 | SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
 | Voice control | Text-first evaluation matrix and ASR error-separation design | Designed only | Requires a language-grounded model that first passes typed prompts |
 
@@ -622,16 +622,36 @@ motion.
 
 The multimodality result above leaves two levers: make the target observable, or
 use a policy class that samples from the action distribution instead of returning
-its mean. SmolVLA's flow-matching head is the second lever, and testing it needs
-no new data — the red-left 20 episodes already exist.
+its mean. SmolVLA's flow-matching head is the second lever. Testing it needs no
+new data, but it does need **two** runs, because two different questions are
+easily confused here:
 
-This run is deliberately **not** the language experiment below. It is a single
-task, the same 20 episodes ACT was trained and evaluated on, so the only thing
-that changes is the policy.
+- **Does a pretrained VLA beat a from-scratch ACT on 20 demonstrations?** Answered
+  on `redleft-20`, which sits close to a single target layout.
+- **Does sampling instead of averaging fix the multimodality failure?** Only
+  answerable on `combined-40`, where the two layouts do not overlap. This is the
+  dataset ACT averaged on and scored 0/6. **Red-left cannot test it**, because
+  there is no second mode there to average over.
+
+Both arms run the same recipe against the ACT numbers already measured, so the
+comparison is a 2x2 with data and policy as the two factors:
+
+| | ACT | SmolVLA |
+| --- | ---: | ---: |
+| `redleft-20` (near single layout) | 2/5 | running |
+| `combined-40` (two disjoint layouts) | **0/6** | running |
+
+The bottom row carries the argument. If SmolVLA holds up on the merged data where
+ACT released between the modes, "sample rather than average" stops being a claim
+repeated from a paper and becomes a measurement. If it fails the same way, the
+binding constraint is perception rather than policy class, and no head fixes it.
+Both outcomes are informative, which is what makes it worth the GPU time.
+
+Neither arm is the language experiment below; both are single-task.
 
 | | ACT | SmolVLA |
 | --- | --- | --- |
-| Data | redleft 20 episodes / 11,960 frames | same |
+| Data | redleft 20 / 11,960 frames, and combined 40 / 23,920 | same two datasets |
 | Method | full fine-tune (ACT trains from scratch) | `freeze_vision_encoder` + `train_expert_only`, the released config's own setting |
 | Batch x steps | 8 x 30,000 | 8 x 30,000 |
 | Seed | 1000 | 1000 |
