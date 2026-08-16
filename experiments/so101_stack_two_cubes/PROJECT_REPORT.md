@@ -312,9 +312,54 @@ falling by a factor of 64. A 30k-step ACT run goes from about 3.3 hours to about
 The identical logged loss matters as much as the speed: sample order is fixed by
 the seed, not by the worker count, so this changes throughput and **not the
 training itself**. The setting was initially left at 0 out of a reproducibility
-concern that this measurement shows was unfounded. It now defaults to half the
-host's cores capped at 8 — 8 on the A4500, 4 on the Jetson — and is still
-overridable through `LEROBOT_NUM_WORKERS`.
+concern that this measurement shows was unfounded.
+
+### Reading `data_s` and `updt_s`, and choosing a worker count
+
+Both come from `lerobot_train.py` and sit back to back in the same loop, so step
+wall time is approximately their sum.
+
+`data_s` brackets `next(dl_iter)` plus the preprocessor. What it measures depends
+entirely on the worker count: at 0 there are no background processes, so video
+decode happens inside that call and is counted; above 0 the workers prefetch and
+the call usually returns an already-decoded batch, leaving only preprocessing.
+So `data_s` is not "how expensive is data loading" — it is **how long the
+training loop sat waiting for data**.
+
+`updt_s` covers `update_policy` end to end: forward, backward, gradient clipping,
+optimizer step, and scheduler step. It is pure compute and does not move with the
+data pipeline. Both are `AverageMeter`s, so a logged value is the mean since the
+previous log line, not an instantaneous reading.
+
+That gives one ratio worth watching, `data_s / (data_s + updt_s)`: the fraction
+of each step spent waiting rather than training. Above roughly 30 percent the run
+is data-bound and more workers will pay; below about 10 percent it is
+compute-bound and they cannot. The ACT runs at `num_workers=0` sat at **60
+percent**, which is why the fix was worth 2.66x.
+
+Raising the count past that point does not help, and a sweep on the same dataset
+confirms it costs. Measured while an unrelated training job shared the host,
+which is the realistic condition here:
+
+| workers | `updt_s` | `data_s` | 150 steps | peak RSS |
+| ---: | ---: | ---: | ---: | ---: |
+| 4 | 0.160 | 0.009 | **39.68 s** | **2.5 GB** |
+| 8 | 0.162 | 0.011 | 40.41 s | 3.0 GB |
+| 16 | 0.163 | 0.018 | 41.62 s | 4.1 GB |
+| 20 | 0.166 | 0.018 | **42.20 s** | **4.6 GB** |
+
+Twenty workers is **6 percent slower than four and uses 84 percent more memory**.
+By four, `data_s` is already 5 percent of the step; there is nothing left to
+recover, and the extra processes only add scheduling overhead and RSS — `data_s`
+itself rises from 0.009 to 0.018.
+
+The count therefore should not be set as a fraction of the core count. It should
+be raised until `data_s` is small next to `updt_s` and then left alone: on a
+40-core host, 32 cores having nothing to do is the correct outcome for this
+workload. The default is half the cores capped at 8 — 8 on the A4500, 4 on the
+Jetson, where 4.6 GB of loader memory would also matter on a 16 GB unified-memory
+board — and `LEROBOT_NUM_WORKERS` still overrides it. A dataset with more cameras
+or higher resolution would move the bound and should be re-measured, not assumed.
 
 Read alone, this says the fixed front camera is a distractor rather than an
 information source. The physical trials then showed that reading is wrong, for a
