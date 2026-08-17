@@ -113,8 +113,8 @@ if [[ "$use_async" == true ]]; then
 fi
 
 # --- gates -------------------------------------------------------------------
-gate_pose=("$python_bin" "$script_dir/check_start_pose.py" --profile vertical)
-gate_scene=("$python_bin" "$script_dir/check_wrist_cube_view.py" --camera-index 0)
+gate_pose=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/check_start_pose.py" --profile vertical)
+gate_scene=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/check_wrist_cube_view.py" --camera-index 0)
 
 if "$dry_run"; then
   printf '\npose gate:\n  '; printf '%q ' "${gate_pose[@]}"
@@ -148,9 +148,13 @@ if [[ "$use_async" == true ]]; then
     exit 1
   fi
 
-  server_cmd=("$python_bin" -m lerobot.async_inference.policy_server
+  # PYTHONNOUSERSITE is not optional on the Jetson: ~/.local carries a newer
+  # transformers than the conda environment, and under it lerobot's groot config
+  # fails to even define itself, so importing the policy factory raises. Every
+  # other entry point in this project sets it; these two were missed.
+  server_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" -m lerobot.async_inference.policy_server
     --host=127.0.0.1 "--port=$server_port" "--fps=$fps")
-  client_cmd=("$python_bin" -m lerobot.async_inference.robot_client
+  client_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" -m lerobot.async_inference.robot_client
     --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=lerobot_follower_arm
     "--robot.cameras=$cameras"
     "--task=$TASK"
@@ -203,7 +207,7 @@ if [[ -f "$dataset_root/meta/info.json" && ! -f "$dataset_root/meta/tasks.parque
   fi
 fi
 
-record_cmd=("$record_bin"
+record_cmd=(env PYTHONNOUSERSITE=1 "$record_bin"
   --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=lerobot_follower_arm
   "--robot.cameras=$cameras"
   "--policy.type=$policy_type"
