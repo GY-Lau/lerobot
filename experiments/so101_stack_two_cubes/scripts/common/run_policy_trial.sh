@@ -154,7 +154,10 @@ if [[ "$use_async" == true ]]; then
   # other entry point in this project sets it; these two were missed.
   server_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" -m lerobot.async_inference.policy_server
     --host=127.0.0.1 "--port=$server_port" "--fps=$fps")
-  client_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" -m lerobot.async_inference.robot_client
+  # Not "-m lerobot.async_inference.robot_client": that module leaves the robot and
+  # camera registries empty, so draccus rejects every --robot.type. The wrapper
+  # imports them first and then calls the same entry point.
+  client_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/async_robot_client.py"
     --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=lerobot_follower_arm
     "--robot.cameras=$cameras"
     "--task=$TASK"
