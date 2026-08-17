@@ -127,28 +127,49 @@ obs = {k: torch.rand(3, 480, 640) for k in cams}
 obs["observation.state"] = torch.rand(state_dim)
 obs["task"] = "Stack the yellow cube on top of the red cube"
 
-lat = []
-for i in range(iters + 10):
+# The number that matters is the chunk refresh, not the cached replay, so measure
+# them separately and take many samples of the expensive one. Resetting before
+# every timed call forces a refresh each time.
+def timed(call):
     t0 = time.perf_counter()
     with torch.inference_mode():
-        policy.select_action(pre(obs))
+        call()
     if device.type == "cuda":
         torch.cuda.synchronize()
-    if i >= 10:                      # discard warmup
-        lat.append((time.perf_counter() - t0) * 1000.0)
-    if hasattr(policy, "reset") and (i + 1) % policy.config.n_action_steps == 0:
-        policy.reset()               # force a fresh chunk, the expensive path
+    return (time.perf_counter() - t0) * 1000.0
 
-lat.sort()
-p = lambda q: lat[min(int(len(lat) * q), len(lat) - 1)]
-print(f"[prepare] select_action over {len(lat)} calls (ms): "
-      f"p50={p(0.5):.1f} p95={p(0.95):.1f} max={lat[-1]:.1f}")
+for _ in range(3):                       # absorb lazy init before anything is recorded
+    policy.reset()
+    timed(lambda: policy.select_action(pre(obs)))
+
+refresh, cached = [], []
+for _ in range(iters):
+    policy.reset()
+    refresh.append(timed(lambda: policy.select_action(pre(obs))))
+    cached.append(timed(lambda: policy.select_action(pre(obs))))
+
+def pct(xs, q):
+    s = sorted(xs)
+    return s[min(int(len(s) * q), len(s) - 1)]
+
+n_act = policy.config.n_action_steps
 budget = 1000.0 / 30.0
-slow = sum(1 for x in lat if x > budget)
-print(f"[prepare] 30 FPS budget is {budget:.1f} ms; {slow}/{len(lat)} calls exceed it "
-      f"({100.0 * slow / len(lat):.1f}%)")
-print("[prepare] NOTE: chunked policies pay the cost on refresh and replay cached "
-      "actions in between, so read p95 together with the exceed rate, not alone.")
+r50, r95 = pct(refresh, 0.5), pct(refresh, 0.95)
+c50 = pct(cached, 0.5)
+print(f"[prepare] chunk refresh over {len(refresh)} samples (ms): "
+      f"p50={r50:.1f} p95={r95:.1f} min={min(refresh):.1f} max={max(refresh):.1f}")
+print(f"[prepare] cached replay  over {len(cached)} samples (ms): p50={c50:.1f}")
+
+# What a synchronous 30 FPS loop actually gets: one refresh, then n_act-1 replays.
+cycle = r50 + (n_act - 1) * c50
+motion = n_act * budget
+print(f"[prepare] synchronous cycle: {n_act} actions cost {cycle:.0f} ms of wall time, "
+      f"of which {r50:.0f} ms ({100.0 * r50 / cycle:.0f}%) is the robot standing still")
+print(f"[prepare] effective rate {1000.0 * n_act / cycle:.1f} FPS against a 30 FPS target; "
+      f"the arm moves for {motion:.0f} ms then stalls for {r50:.0f} ms")
+print("[prepare] NOTE: this measures LeRobot's SYNCHRONOUS loop. lerobot.async_inference "
+      "generates the next chunk while the current one executes and removes the stall "
+      "without making the model faster.")
 PY
 status=$?
 (( status == 0 )) || die "the policy did not load or benchmark cleanly (status $status)"
