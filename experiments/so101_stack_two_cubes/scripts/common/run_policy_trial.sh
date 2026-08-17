@@ -136,6 +136,18 @@ fi
 
 # --- controller --------------------------------------------------------------
 if [[ "$use_async" == true ]]; then
+  # The async stack is an optional dependency group, so a machine that trains and
+  # evaluates fine can still be missing it. Say so here rather than letting the
+  # server exit on an import and look like a crash.
+  if ! PYTHONNOUSERSITE=1 "$python_bin" -c 'import grpc' >/dev/null 2>&1; then
+    echo "The asynchronous controller needs grpcio, which is not installed." >&2
+    echo "Install the wheel without disturbing anything else:" >&2
+    echo "  $python_bin -m pip install --only-binary=:all: --no-deps grpcio==1.73.1" >&2
+    echo "(lerobot also pins protobuf<6.32.0 in that group; the newer runtime this" >&2
+    echo " machine already has works, and downgrading it would break wandb.)" >&2
+    exit 1
+  fi
+
   server_cmd=("$python_bin" -m lerobot.async_inference.policy_server
     --host=127.0.0.1 "--port=$server_port" "--fps=$fps")
   client_cmd=("$python_bin" -m lerobot.async_inference.robot_client
