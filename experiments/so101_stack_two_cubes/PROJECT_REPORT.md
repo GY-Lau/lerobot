@@ -128,7 +128,7 @@ other**. That coincidence is convenient, not engineered.
 | Red-left placement redesign | Occlusion verified fixed in recorded video; 20 episodes collected and merged to 40; both 30k checkpoints trained | Physically tested at n=100: redleft-20 scored 2/5 under matched lighting, the best result in the project so far | Larger paired sample; placement remains the binding failure |
 | Layout-mixing / multimodality | Front-camera red-cube distributions (20/20 clean per dataset), signed teacher-forced release error, and a prior-sampling latent probe over 205 release frames | Merging disjoint layouts measurably hurt; underfitting excluded by a 0.92 bias ratio, and the CVAE-latent explanation excluded by the probe | None for the mechanism; the fix now belongs to observability or policy class |
 | Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
-| Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete, stock Jetson deployment not real time | Matched physical comparison requires a disclosed deployable inference setup |
+| Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete; not real time under LeRobot's *synchronous* loop, which is the only controller tested | Either an asynchronous controller (chunk N+1 generated while N executes) or a disclosed non-Jetson inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA vs ACT (single task) | Both arms of a 2x2: red-left 20 and combined 40, same batch/steps/seed as ACT, each side on its own published hyperparameters | Both training on the A4500 under the released recipe | Jetson latency measurement, then physical trials under the ACT protocol. The combined-40 arm is the one that tests the multimodality claim |
 | SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
@@ -419,7 +419,12 @@ The front camera's cost is real too: jerkier motion, visible joint jumps at each
 ### Generation 3: red-left layout, to fix placement
 
 With grasping working, the remaining wall is **placement**: cubes released too
-high, off-center, or gripped at an edge and dropped. This is the original
+high, off-center, or gripped at an edge and dropped. The coarse phase — find the
+cube, approach, close — works; what fails is the last centimetre of alignment
+before release. That split between a reliable coarse phase and an unreliable
+contact-critical one is the general shape of the problem, and it is worth naming
+because it predicts which interventions can help: anything that improves gross
+trajectory quality will not touch it. This is the original
 observability problem displaced to the release instant — at that moment the
 **wrist camera is blocked by the held yellow cube** and the **front camera is
 blocked by the gripper body**, so nothing sees the red base cube.
@@ -617,6 +622,21 @@ claim: the trained Diffusion model is not real time on this Jetson with the
 current architecture and synchronous controller. Reducing denoising steps
 improves latency but changes the policy computation and degraded the observed
 motion.
+
+The qualifier "with the current synchronous controller" is doing real work and
+should not be dropped. The pause-then-burst pattern above comes from a control
+loop that **stops and waits** for the next chunk. Generating the next chunk while
+the current one is still executing removes the stall without making the model any
+faster, at the cost of having to join a new chunk onto a trajectory already in
+motion. Physical Intelligence's real-time chunking (RTC) treats exactly that join
+as the problem to solve. **This project has not implemented or evaluated it**, and
+the numbers above say nothing about it; the honest statement is that the
+measured setup is not real time and that an asynchronous alternative exists and
+was not tried, not that diffusion-class policies cannot run on this hardware.
+
+The same qualifier applies to the SmolVLA latency measurement still to come:
+whatever it reports will characterise LeRobot's synchronous loop, not the policy's
+ceiling.
 
 ## SmolVLA versus ACT on identical data
 
