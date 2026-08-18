@@ -155,12 +155,15 @@ if [[ "$use_async" == true ]]; then
   # transformers than the conda environment, and under it lerobot's groot config
   # fails to even define itself, so importing the policy factory raises. Every
   # other entry point in this project sets it; these two were missed.
-  server_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/async_policy_server.py"
+  # HF_HUB_OFFLINE matters as much as PYTHONNOUSERSITE here: the checkpoint's
+  # preprocessor names the backbone by Hub id, and without it from_pretrained
+  # goes to huggingface.co, which this machine cannot reach, and blocks there.
+  server_cmd=(env PYTHONNOUSERSITE=1 HF_HUB_OFFLINE=1 "$python_bin" "$script_dir/async_policy_server.py"
     --host=127.0.0.1 "--port=$server_port" "--fps=$fps")
   # Not "-m lerobot.async_inference.robot_client": that module leaves the robot and
   # camera registries empty, so draccus rejects every --robot.type. The wrapper
   # imports them first and then calls the same entry point.
-  client_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/async_robot_client.py"
+  client_cmd=(env PYTHONNOUSERSITE=1 HF_HUB_OFFLINE=1 "$python_bin" "$script_dir/async_robot_client.py"
     --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=lerobot_follower_arm
     "--robot.cameras=$cameras"
     "--task=$TASK"
@@ -202,7 +205,7 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)"
     kill -0 "$server_pid" 2>/dev/null || { echo "Policy server died; see $server_log" >&2; exit 1; }
     echo "policy server started (pid $server_pid, log $server_log)"
     echo "  it stops with this trial. To keep it warm across trials, start it yourself:"
-    echo "    env PYTHONNOUSERSITE=1 $python_bin $script_dir/async_policy_server.py --host=127.0.0.1 --port=$server_port --fps=$fps &"
+    echo "    env PYTHONNOUSERSITE=1 HF_HUB_OFFLINE=1 $python_bin $script_dir/async_policy_server.py --host=127.0.0.1 --port=$server_port --fps=$fps &"
   fi
   # The server loads the checkpoint when the client first connects; SmolVLA took
   # 39 s of it on the Jetson. Timing the trial from process start charges that to
