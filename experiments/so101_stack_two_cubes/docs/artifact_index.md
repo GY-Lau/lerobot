@@ -94,6 +94,10 @@ these. Scripts are runnable CLIs; CSV and TXT files are their committed outputs.
   expected SHA-256 identities.
 - [`prepare_smolvla_base.sh`](../scripts/smolvla/prepare_smolvla_base.sh): resumable pinned
   snapshot download through the configured Hugging Face endpoint.
+- [`slot_probe.py`](../scripts/smolvla/slot_probe.py): measures whether SmolVLA's
+  pretrained backbone treats its three camera slots interchangeably, against the
+  scale of a scene change, with a same-input control to confirm the flow-matching
+  noise was held fixed.
 - [`verify_smolvla_base.py`](../scripts/smolvla/verify_smolvla_base.py): rejects missing,
   empty, or hash-mismatched base-model snapshots before PEFT training.
 - [`validate_language_dataset.py`](../scripts/smolvla/validate_language_dataset.py): verifies
