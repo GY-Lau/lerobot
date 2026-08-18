@@ -67,16 +67,27 @@ the light off completed **0/3** grasps; lit, the same checkpoint completed
 project, and it came from a variable nobody was controlling. The pre-trial gates
 check that both cubes are visible; they do not check illumination.
 
-**7. A policy has to be executed continuously, and a shared controller is not
-automatically a fair one.** Running SmolVLA through the same synchronous loop as
-ACT scored **0/5**, failing at approach — it could not line up over the cube.
-The same checkpoint asynchronously scored **3/5**, failing only at placement.
-The cause is arithmetic, not policy: inference is 1.255 s against 1.67 s of
-chunk playback, so the arm freezes 43% of the time, and **the demonstrations
-contain no pauses**. ACT is immune because its inference is 15 ms against 3.3 s,
-so "both synchronous" handicaps one side only. Halving the chunk to 25 steps
-reacted faster and still failed, which rules out replanning frequency and leaves
-continuity.
+**7. There is no controller that is neutral between these two policies.**
+Running each family under both controllers gives opposite answers:
+
+| | synchronous | asynchronous |
+| --- | ---: | ---: |
+| ACT | 2/8 (25%) | 1/5 (20%) |
+| SmolVLA | 0/5 (0%) | **3/5 (60%)** |
+
+SmolVLA needs asynchrony because its 1.255 s inference against 1.67 s of chunk
+playback freezes the arm 43% of the time, and **the demonstrations contain no
+pauses**; synchronously it failed at approach every time. ACT does not benefit
+and its failures changed character: three of five async trials **stalled outright**
+— grasped and never lifted, stuttered at the start pose, could not carry the cube
+across — which never happened in eight synchronous trials. Its 15 ms inference
+lets the server emit a chunk almost every tick, each blended with the last, which
+is the frequent-replanning-plus-averaging condition that already made this policy
+stutter under temporal ensembling (finding #3). **The best controller depends on
+the ratio of inference time to chunk duration, and that ratio differs by 80x
+between the two families**, so controller and policy class cannot be
+disentangled by picking one for both. An `n_action_steps=25` control also failed
+for SmolVLA, ruling out replanning frequency there and leaving continuity.
 
 **8. A sampling policy did not reproduce the averaging failure.** On the merged
 `combined-40` that cost ACT everything (0/6, releasing short of the target),
@@ -152,7 +163,7 @@ other**. That coincidence is convenient, not engineered.
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete; not real time under LeRobot's *synchronous* loop, which is the only controller tested | Either an asynchronous controller (chunk N+1 generated while N executes) or a disclosed non-Jetson inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA vs ACT (single task) | Both arms trained and physically evaluated; 20 trials in `trials.csv`; server-side inference measured at p50 1.255 s | 2x2 complete: SmolVLA 3/5 on red-left and 2/5 on combined against ACT's 2/8 and 0/6, with none of its failures showing ACT's release-short signature | Larger samples; ACT has not been run asynchronously, so controller and policy remain confounded |
-| Controller and execution continuity | Same SmolVLA checkpoint, same scene, same session: 0/5 synchronous against 3/5 asynchronous, plus an n_action_steps=25 control that also failed | Complete; the duty-cycle arithmetic (57% in motion synchronously against ACT's 100%) explains it | None for the mechanism; ACT asynchronously would show whether the effect is symmetric |
+| Controller x policy family | Both families under both controllers, 26 trials: SmolVLA 0/5 sync against 3/5 async, ACT 2/8 sync against 1/5 async with three outright stalls | Complete; the effect is opposite in sign, and the duty-cycle arithmetic explains both directions | None; the confound is irreducible, so each family is reported under the controller that suits it |
 | Jetson power mode | MAXN_SUPER with jetson_clocks against the 25 W default, identical weights | Refresh 1,847 ms to 1,070 ms, a 42% reduction | None; it is now held fixed for every SmolVLA trial |
 | SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
 | Voice control | Text-first evaluation matrix and ASR error-separation design | Designed only | Requires a language-grounded model that first passes typed prompts |
@@ -679,7 +690,7 @@ here, and only one of them is about multimodality:
 Both arms ran the same recipe: the released checkpoint's own config, batch 8,
 30,000 steps, seed 1000, no hyperparameter overrides — the ACT contract as well.
 
-### The controller has to be chosen before the policies can be compared
+### No controller is neutral between these two policies
 
 The obvious plan, run both families synchronously as the ACT trials were, turns
 out to handicap only one of them. Inference cost relative to chunk playback
@@ -695,25 +706,37 @@ freezes for 1.25 s out of every 2.9 — and **the demonstrations contain no
 pauses**, so stop-start execution is out of distribution in a dimension nobody
 had been tracking.
 
-The trials say the same thing. Same checkpoint, same data, same session, same
-scene, only the controller changed:
+Running both families under both controllers, 26 trials, gives opposite answers:
 
-| Controller | Result | Where it failed |
-| --- | ---: | --- |
-| Synchronous, `n_action_steps` 50 | **0/5** | approach and grasp — could not line up over the cube |
-| Synchronous, `n_action_steps` 25 | 0/1 | quicker to react, still could not line up |
-| Asynchronous | **3/5** | placement and retreat, never approach |
+| | synchronous | asynchronous |
+| --- | ---: | ---: |
+| ACT `redleft` | 2/8 (25%) | 1/5 (20%) |
+| SmolVLA `redleft` | 0/5 (0%) | **3/5 (60%)** |
 
-The `n=25` control matters: halving the chunk halves the blind stretch but not
-the freeze, since inference costs the same either way, and the duty cycle drops
-from 57% to 40% moving. It failed the same way. That rules out replanning
-frequency as the explanation and leaves **motion continuity**.
+For SmolVLA the controller is the difference between failing at approach every
+time and completing three of five. An `n_action_steps=25` control reacted faster
+and failed the same way: halving the chunk halves the blind stretch but not the
+freeze, since inference costs the same either way, and the duty cycle drops from
+57% to 40% moving. That rules out replanning frequency and leaves **motion
+continuity**.
 
-So a synchronous SmolVLA number is not a policy result. Asynchronous inference —
-generating chunk N+1 while N executes — is one of the SmolVLA paper's own
-contributions, so the asynchronous arm is the policy run as designed, and the
-synchronous 0/5 is the off-design case. Every SmolVLA number below is
-asynchronous at 30 fps.
+For ACT asynchrony is not an improvement (p = 1.00) and it introduces a failure
+mode that eight synchronous trials never produced: **three of five async trials
+stalled outright** — grasped and never lifted, stuttered at the start pose for
+the whole horizon, tried to carry the cube across and could not. At 15 ms per
+inference the server can emit a fresh chunk on nearly every control tick, and
+each one is blended into the queue by `weighted_average`. That is replanning
+every step with averaging, which is precisely the condition under which this
+policy stuttered during the temporal-ensembling sweep in finding #3.
+
+So the two families want opposite controllers, for the same reason expressed
+twice: **the ratio of inference time to chunk duration differs between them by
+roughly 80x**. Choosing one controller for both does not remove the confound, it
+relocates it. Asynchronous inference is one of the SmolVLA paper's own
+contributions, so its asynchronous arm is the policy as designed; ACT's
+synchronous loop is already continuous and is its own best case. Each is
+reported under the controller that suits it, and the two columns of the 2x2
+below are **not interchangeable**.
 
 Two Jetson settings had to be right first. **MAXN_SUPER with `jetson_clocks`
 cut refresh from 1,847 ms to 1,070 ms, a 42% reduction on identical weights**,
@@ -778,9 +801,10 @@ rather than about perception or policy class.
 - That SmolVLA beats ACT. Both differences are within noise at these sample
   sizes, and the two families ran under different controllers because a shared
   one would have handicapped SmolVLA. Controller and policy are confounded.
-- That the ACT numbers would survive the same treatment. ACT has not been run
-  asynchronously; its synchronous loop is already continuous, so the change
-  should matter less, but that is an argument, not a measurement.
+- That either family would do better under the other's controller. Both were
+  run both ways: asynchrony took SmolVLA from 0/5 to 3/5 and left ACT at 1/5
+  against 2/8 while adding stalls it never showed synchronously. The confound is
+  irreducible, not unmeasured.
 - That the pretrained prior is doing the work. SmolVLA's pretraining is
   SO-100 community data and this is an SO-101, which is close, but the wrist
   camera here is mounted rotated 90 degrees from upright and the two cameras
@@ -952,9 +976,11 @@ hashes before the publication status is changed from `local_only`.
 - that SmolVLA outperforms ACT. Every pair is within noise at these sample sizes
   (Fisher p 0.18 on the merged data), and the two families necessarily ran under
   different controllers, so controller and policy class are confounded;
-- that ACT would not also improve asynchronously. It has not been run that way.
-  Its synchronous loop is already continuous, so the change should matter less,
-  but that is an argument rather than a measurement;
+- that running both families asynchronously removes the confound. It does not.
+  ACT went 2/8 to 1/5 (p = 1.00) and picked up a stalling failure mode it never
+  showed synchronously, so asynchrony helps the slow policy and hurts the fast
+  one. Each family is reported under the controller that suits it, and the two
+  columns are not interchangeable;
 - that SmolVLA's pretrained prior is what produced the difference. Its
   pretraining is SO-100 community data and this is an SO-101, but the wrist
   camera is mounted rotated 90 degrees from upright and both cameras sit in slots
@@ -981,10 +1007,11 @@ Ordered by what would change a conclusion, not by effort.
    positions.** The current set sits within about 6 px of one configuration, so
    its 5/5 grasp rate says nothing about spatial generalisation. Do not merge
    them with the earlier layout.
-4. **Run ACT asynchronously.** It is the one cell that would remove the
-   controller confound from the SmolVLA comparison, and finding #3 predicts it
-   could go either way: async replans more often, and this policy degraded the
-   more often it replanned. Either outcome settles something.
+4. **Evaluate the merged checkpoint in the layout it was not tested in.** The
+   `combined-40` model saw both cube arrangements; it has only been run against
+   the red-left one. Running it with the red cube in the earlier position asks
+   directly whether a sampling policy represents both modes or collapsed onto
+   one — the question findings #4, #5 and #8 circle without settling.
 5. **Re-run the front-camera ablation properly paired at n=100**, scored with a
    recovery-aware metric — attempts per grasp, time to first stable grasp —
    rather than teacher-forced error, which finding #2 showed ranks it backwards.
