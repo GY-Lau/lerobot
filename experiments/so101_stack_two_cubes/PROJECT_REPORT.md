@@ -1013,7 +1013,7 @@ hashes before the publication status is changed from `local_only`.
 | ACT v2 checkpoints | Both final checkpoints on Jetson; v2-50 trained in the isolated A4500 workspace | Training and contract verification complete; Hub publication and physical evaluation pending |
 | Dual-camera 20ep dataset + checkpoint | Jetson cache; A4500 `datasets/` and `outputs/train/` | Complete; 0/6 physical outcomes recorded in this report only, never logged to CSV at the time |
 | Vertical 20ep dataset + checkpoint | Jetson cache; A4500; wrist-only ablation copy alongside | Complete; both variants physically tested |
-| Teacher-forced diagnostic summaries | A4500: four ACT checkpoints, plus `combined-40` SmolVLA against both training layouts | Numbers reproduced in this report; raw summaries not yet committed |
+| Teacher-forced diagnostic summaries | A4500: four ACT checkpoints, plus `combined-40` SmolVLA against both training layouts | SmolVLA pair committed under `results/teacher_forced/`; the four ACT summaries are reproduced in this report but not committed |
 | Vertical physical trials (n=20, n=100, ensembling, n=50) | Recorded eval episodes on the Jetson; outcomes narrated per trial | Reported here; not yet normalized into `trials.csv` |
 | Red-left 20ep dataset | Jetson cache; transferred to A4500 and load-verified | Collection complete; Hub publication pending |
 | Combined 40ep dataset | A4500 `datasets/..._vertical_combined_40ep`, 40 eps / 23,920 frames | Built by `merge_two_datasets.py`; load-verified |
@@ -1074,12 +1074,14 @@ hashes before the publication status is changed from `local_only`.
 
 Ordered by what would change a conclusion, not by effort.
 
-1. **Get the physical numbers out of narration.** The 14 red-left trials are in
-   `trials.csv` and `summarize_trials.py` reproduces their rates and intervals
-   from the file. The 0/6 dualcam outcomes and the vertical `n=20`/`n=100` trials
-   are still narrated only. The summariser also groups by `run_id` and knows
-   nothing about illumination, so the matched-lighting 2/5 is still separated by
-   hand.
+1. **Get the last physical numbers out of narration.** 55 trials across 11
+   `run_id`s are in `trials.csv`, and `summarize_trials.py` reproduces their
+   rates and intervals from the file. Two results are still narrated only: the
+   **0/6 dualcam** outcomes from Generation 1, and the **`n_action_steps=20`
+   arm** of the deployment sweep — which matters, because that sweep's 0/5 to
+   4/5 is finding #3's entire evidence. The summariser also groups by `run_id`
+   and knows nothing about illumination, so the matched-lighting 2/5 is still
+   separated by hand.
 2. **Re-run the three unlit red-left trials with the light on**, taking that
    estimate from five matched-lighting trials to eight, and decide whether
    illumination is fixed by protocol or covered by recorded data.

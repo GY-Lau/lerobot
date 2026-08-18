@@ -1,0 +1,64 @@
+{
+  "model": "outputs/train/smolvla_expert_combined_40ep_b8_30k/checkpoints/030000/pretrained_model",
+  "repo_id": "GY-William/lerobot_stack_two_cubes_vertical_20ep",
+  "action_norm": "MEAN_STD",
+  "frames_evaluated": 1500,
+  "episodes": 20,
+  "chunk_size": 50,
+  "overall_1step_mae_raw_units": 1.5851,
+  "per_joint_1step_mae": {
+    "shoulder_pan.pos": 0.6652,
+    "shoulder_lift.pos": 2.7241,
+    "elbow_flex.pos": 2.744,
+    "wrist_flex.pos": 1.0261,
+    "wrist_roll.pos": 1.2227,
+    "gripper.pos": 1.1287
+  },
+  "horizon_mae": {
+    "0": 1.5851,
+    "1": 1.7907,
+    "2": 1.7524,
+    "5": 1.8664,
+    "10": 1.6986,
+    "20": 1.963,
+    "49": 2.4291
+  },
+  "phase_decile_mae": [
+    1.5236,
+    1.6585,
+    1.7333,
+    1.6572,
+    1.7661,
+    1.5771,
+    1.5916,
+    1.6558,
+    1.4871,
+    1.1758
+  ],
+  "grasp_aligned_mae": {
+    "-5": 1.7016,
+    "-4": 1.4884,
+    "-3": 1.6042,
+    "-2": 2.4377,
+    "-1": 2.2407,
+    "0": 2.5296,
+    "1": 2.4885,
+    "2": 1.9511,
+    "3": 1.5381,
+    "4": 1.2764,
+    "5": 1.5227
+  },
+  "release_aligned_mae": {
+    "-5": 2.1167,
+    "-4": 1.9445,
+    "-3": 2.1367,
+    "-2": 2.1302,
+    "-1": 1.5321,
+    "0": 2.1896,
+    "1": 2.0502,
+    "2": 1.7583,
+    "3": 2.4131,
+    "4": 1.8398,
+    "5": 2.3353
+  }
+}
