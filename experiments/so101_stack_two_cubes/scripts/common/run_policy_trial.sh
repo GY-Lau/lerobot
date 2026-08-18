@@ -256,7 +256,10 @@ if [[ -f "$dataset_root/meta/info.json" && ! -f "$dataset_root/meta/tasks.parque
   fi
 fi
 
-record_cmd=(env PYTHONNOUSERSITE=1 "$record_bin"
+# HF_HUB_OFFLINE for the same reason as the async path: the checkpoint names
+# its backbone by Hub id, so without it every trial makes a network round trip
+# for a config that is already on disk.
+record_cmd=(env PYTHONNOUSERSITE=1 HF_HUB_OFFLINE=1 "$record_bin"
   --robot.type=so101_follower --robot.port=/dev/ttyACM0 --robot.id=lerobot_follower_arm
   "--robot.cameras=$cameras"
   "--policy.type=$policy_type"
