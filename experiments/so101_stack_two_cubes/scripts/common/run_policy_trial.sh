@@ -215,6 +215,14 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)" && break
   sleep "$episode_time_s"
   kill "$client_pid" 2>/dev/null; sleep 2
   kill "$server_pid" 2>/dev/null
+
+  # A killed client never reaches its disconnect, so disable_torque_on_disconnect
+  # never fires and the arm is left rigid -- it cannot be repositioned by hand for
+  # the next trial. Release it here, whatever the client did on the way out.
+  echo "releasing motor torque"
+  env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/release_torque.py" /dev/ttyACM0 \
+    || echo "  WARNING: could not release torque; run $script_dir/release_torque.py by hand" >&2
+
   echo "Trial finished after ${episode_time_s}s of motion. Nothing was recorded;"
   echo "log the outcome with common/log_trial.py."
   exit 0
