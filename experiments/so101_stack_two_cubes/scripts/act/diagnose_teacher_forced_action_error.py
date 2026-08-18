@@ -35,8 +35,8 @@ import numpy as np
 import torch
 
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.policies.act.modeling_act import ACTPolicy
-from lerobot.policies.factory import make_pre_post_processors
+from lerobot.configs.policies import PreTrainedConfig
+from lerobot.policies.factory import get_policy_class, make_pre_post_processors
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo-id", required=True, help="Expert dataset repo id (observations to feed)")
     p.add_argument("--root", default=None, help="Optional local dataset root override")
     p.add_argument("--device", default="cuda")
+    p.add_argument("--seed", type=int, default=1000, help="Noise seed for sampling policies")
     p.add_argument("--stride", type=int, default=2, help="Evaluate every Nth frame (speed vs density)")
     p.add_argument("--max-episodes", type=int, default=0, help="0 = all episodes")
     p.add_argument(
@@ -55,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def normalization_stats(policy: ACTPolicy, dataset: LeRobotDataset) -> tuple[str, np.ndarray, np.ndarray]:
+def normalization_stats(policy, dataset: LeRobotDataset) -> tuple[str, np.ndarray, np.ndarray]:
     """Return (mode, a, b) so that raw = decode(norm) per the policy's action norm.
 
     MEAN_STD: raw = norm * b + a, with a=mean, b=std.
@@ -83,7 +84,11 @@ def main() -> int:
     device = torch.device(args.device)
 
     print(f"Loading policy: {args.model}")
-    policy = ACTPolicy.from_pretrained(args.model)
+    # Pick the class from the checkpoint rather than assuming ACT, so the same
+    # diagnostic works on SmolVLA. ACT is deterministic at inference (the latent
+    # is zeroed), so nothing about its numbers changes.
+    policy_cfg = PreTrainedConfig.from_pretrained(args.model)
+    policy = get_policy_class(policy_cfg.type).from_pretrained(args.model, config=policy_cfg)
     policy.to(device)
     policy.eval()
 
@@ -125,7 +130,9 @@ def main() -> int:
 
     # Accumulators.
     per_joint_abs_1step: list[np.ndarray] = []          # |pred[0]-expert[t]| per joint (raw units)
-    horizon_offsets = [0, 1, 2, 5, 10, 20, 50, min(99, chunk - 1)]
+    # Clamp to the policy's own chunk: ACT's is 100, SmolVLA's is 50, and a
+    # hardcoded 50 indexes past the end of the shorter one.
+    horizon_offsets = sorted({k for k in (0, 1, 2, 5, 10, 20, 50, 99) if k < chunk} | {chunk - 1})
     horizon_abs: dict[int, list[float]] = {k: [] for k in horizon_offsets}  # mean-over-joints L1 (raw)
     decile_abs: list[list[float]] = [[] for _ in range(10)]  # mean-over-joints L1 by episode progress
     grasp_window_abs: dict[int, list[float]] = {d: [] for d in range(-5, 6)}   # around gripper-close
@@ -161,6 +168,9 @@ def main() -> int:
             if "task" in item:
                 obs["task"] = item["task"]
             batch = preprocessor(obs)
+            # Flow-matching policies sample noise; hold it fixed so two runs of
+            # this diagnostic are comparable. A no-op for ACT.
+            torch.manual_seed(args.seed)
             with torch.inference_mode():
                 chunk_norm = policy.predict_action_chunk(batch)  # (1, chunk, action_dim), normalized
             chunk_norm = chunk_norm[0].detach().to("cpu", dtype=torch.float64).numpy()
