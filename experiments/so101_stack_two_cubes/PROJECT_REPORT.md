@@ -31,7 +31,9 @@ every metric — and the physically stronger policy was wrist+front, because it
 **recovers**: bump the cube, lift, re-align, grasp on the second attempt (4 of 5
 trials). Teacher forcing scores agreement with an expert who never fails, so it
 cannot see recovery. The checkpoint that fit demonstrations best (1.293 deg)
-scored 0/6.
+scored 0/6. The sharpest case is a single checkpoint measured against both of
+its training layouts: **1.585 deg against 1.304, 22% apart, and 0/5 against
+2/5**.
 
 **3. A deployment parameter dominated every model change attempted.** At the
 inherited `n_action_steps=20` both vertical checkpoints scored 0 — not imprecise,
@@ -89,20 +91,21 @@ between the two families**, so controller and policy class cannot be
 disentangled by picking one for both. An `n_action_steps=25` control also failed
 for SmolVLA, ruling out replanning frequency there and leaving continuity.
 
-**8. Sampling avoided the averaging failure and replaced it with mode collapse.**
+**8. Sampling removed the averaging; it did not make the second layout work.**
 On the merged `combined-40` that cost ACT everything (0/6, releasing short of the
-target), SmolVLA scored **2/5**, and none of its failures were that: they were
-placing correctly then knocking the cube off, releasing too high, correcting
-mid-placement — **every error at the target or after it, never short of it**.
-But the merged dataset contains two cube arrangements, and the same checkpoint
-run in the **other** one, which it was equally trained on, scored **0/5**, with
-every failure back at the grasp: jitter, bumping the top of the cube, closing on
-nothing. So one policy still could not hold two modes. ACT returned their mean
-and reached neither; SmolVLA picked one and cannot do the other. **A sampling
-head removes the averaging, not the need to represent both modes.** Caveats: no
-pair is statistically separated (0/5 against 2/5 is p = 0.44), and an occlusion
-explanation is not fully excluded — in that arrangement the red cube sits between
-the gripper and the yellow target.
+target), SmolVLA scored **2/5**, and none of its failures were that: every error
+was at the target or after it, never short of it. But the same checkpoint in the
+**other** arrangement it was equally trained on scored **0/5**, with the failures
+back at the grasp. That looks like mode collapse and is not: fed expert
+observations, the model fits that arrangement almost as well as the one it
+succeeds in — **1.585 deg against 1.304, 22% apart** — and this project's own
+yardstick is a checkpoint that fit to 1.293 and scored 0/6. **Both modes were
+learned; one of them fails in closed loop.** The two joints that set reach and
+height, `shoulder_lift` and `elbow_flex`, are the ones ~50% worse there, and in
+that arrangement the red cube sits between the gripper and the target — so the
+evidence points at occlusion during the approach, not at a missing mode. Third
+instance in this report of open-loop fitting failing to predict closed-loop
+success.
 
 What none of this establishes yet is in
 [Claims not yet supported](#claims-not-yet-supported) — every headline here rests
@@ -168,7 +171,7 @@ other**. That coincidence is convenient, not engineered.
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete; not real time under LeRobot's *synchronous* loop, which is the only controller tested | Either an asynchronous controller (chunk N+1 generated while N executes) or a disclosed non-Jetson inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
 | SmolVLA vs ACT (single task) | Both arms trained and physically evaluated; 25 trials in `trials.csv`; server-side inference measured at p50 1.255 s | 2x2 complete: SmolVLA 3/5 on red-left and 2/5 on combined against ACT's 2/8 and 0/6, with none of its failures showing ACT's release-short signature | Larger samples |
-| Mode collapse on the merged data | Same combined-40 checkpoint in both trained arrangements: 2/5 in one, 0/5 in the other, with failures moving from placement to grasp; wrist view verified undegraded | Sampling removed the averaging but not the need to hold two modes | A teacher-forced comparison against both datasets, to rule out approach-time occlusion; blocked on a full filesystem |
+| The merged checkpoint's swapped-layout failure | Same combined-40 checkpoint in both trained arrangements (2/5 vs 0/5, failures moving from placement to grasp), wrist view verified undegraded, plus a teacher-forced fit against both datasets at 1,500 frames each | Mode collapse **excluded**: fit is 1.585 vs 1.304, and degradation concentrates in `shoulder_lift`/`elbow_flex`. A closed-loop failure, consistent with occlusion during the approach | Direct manipulation of the approach-time occlusion; the mechanism is inferred from where the error sits |
 | Controller x policy family | Both families under both controllers, 26 trials: SmolVLA 0/5 sync against 3/5 async, ACT 2/8 sync against 1/5 async with three outright stalls | Complete; the effect is opposite in sign, and the duty-cycle arithmetic explains both directions | None; the confound is irreducible, so each family is reported under the controller that suits it |
 | Jetson power mode | MAXN_SUPER with jetson_clocks against the 25 W default, identical weights | Refresh 1,847 ms to 1,070 ms, a 42% reduction | None; it is now held fixed for every SmolVLA trial |
 | SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
@@ -791,7 +794,7 @@ placing** (trial 4). That is the closed-loop recovery finding #2 identified as
 invisible to teacher-forced error, now appearing in the policy class that was
 predicted to have it.
 
-### The merged model can only do one of the two layouts it was trained on
+### The merged model fails in one of its two layouts, but it learned both
 
 The `combined-40` dataset holds two cube arrangements. Every trial above used one
 of them — red cube to one side of the yellow. Running the same checkpoint in the
@@ -809,31 +812,52 @@ completely — jitter while retrying, bumping the top of the cube, closing the
 gripper on nothing — which is what a policy looks like in a configuration it has
 no confident action for, not what imprecision looks like.
 
-So the merged checkpoint learned one of its two modes. That reframes finding #8
-rather than contradicting it: **the sampling head did remove the averaging**, and
-none of its failures in either arrangement were ACT's release-short signature.
-What it did not do is represent both modes. ACT returned the mean of the two and
-reached neither target; SmolVLA committed to one and cannot perform the other.
-Both are the same underlying failure — one policy, two modes — wearing different
-clothes.
+The obvious reading is mode collapse: the merged checkpoint learned one of its
+two modes and committed to it. **That reading is wrong.** The diagnostic that
+separates it from a closed-loop failure was generalised to run on SmolVLA and
+run on both datasets — 1,500 frames each, stride 8, the same checkpoint fed the
+expert's own observations:
 
-One check was run before drawing that conclusion, because the obvious
-alternative is a repeat of the observability regression from Generation 1. **The
-wrist view is not degraded**: in the swapped arrangement both cubes still show
-their side faces, so the grasp-height cue that the top-down dual-camera rig lost
-is present here. And the failures never reached the release, so the occlusion
-that motivated the red-left layout in the first place — held cube blocking the
-wrist view, gripper body blocking the front camera — cannot be what stopped them.
+| Dataset (arrangement) | Overall 1-step MAE | At grasp | At release | Physical |
+| --- | ---: | ---: | ---: | ---: |
+| `vertical_redleft_20ep` (evaluated above) | 1.304 | 2.287 | 1.254 | 2/5 |
+| `vertical_20ep` (swapped) | **1.585** | 2.530 | 2.190 | **0/5** |
+| Ratio | **1.22x** | 1.11x | 1.75x | — |
 
-What is **not** excluded: in the swapped arrangement the red cube sits between
-the gripper and the yellow target, so it may occlude the target during the
-approach rather than during the release. That is a different occlusion from the
-one this project has measured before. A teacher-forced comparison of the merged
-checkpoint against both datasets separates the two cleanly — similar fitting
-error on both means the model learned both modes and the failure is closed-loop,
-while markedly worse error on the swapped one means it never learned that mode.
-The diagnostic has been generalised to run on SmolVLA for this purpose; the run
-is pending on the shared host's filesystem, which is full.
+Units are degrees, averaged over the six joints. Fed the right observations, the
+model produces near-expert actions for the arrangement it fails in — **22% worse
+than the one it succeeds in**, against a project yardstick where the dual-camera
+checkpoint fit to **1.293** and scored **0/6**. A mode it had not learned would
+not fit at all. **Both modes are in the weights; one of them collapses in closed
+loop.**
+
+That makes this the third instance of finding #2 in this report, and the
+sharpest one, since here the two numbers come from a single checkpoint:
+
+| | Open-loop fit | Physical |
+| --- | ---: | ---: |
+| Dual-camera (Generation 1) | 1.293 (best measured) | 0/6 |
+| Wrist-only vs wrist+front | wrist-only better on every phase | wrist+front stronger |
+| `combined-40`, swapped layout | 1.585 vs 1.304 | 0/5 vs 2/5 |
+
+Two occlusion hypotheses were excluded before the diagnostic ran. **The wrist
+view is not degraded**: in the swapped arrangement both cubes still show their
+side faces, so the grasp-height cue the top-down rig lost is present here. And
+the failures never reached the release, so the occlusion that motivated the
+red-left layout — held cube blocking the wrist view, gripper body blocking the
+front camera — cannot be what stopped them.
+
+The per-joint breakdown points at a third. `shoulder_lift` and `elbow_flex`, the
+two joints that set the arm's reach and height, are the ones that degrade in the
+swapped arrangement — 2.724 and 2.744 against 1.719 and 1.849, about **50%
+worse** — while `shoulder_pan` is actually *better* there. Reach and height are
+what a depth cue buys, and in that arrangement the red cube sits between the
+gripper and the yellow target during the approach. So the arrangement is
+measurably harder even open-loop, in exactly the degrees of freedom an
+approach-time occlusion would cost, and closed loop it fails outright. That is
+consistent, not proven: nothing here rules out some other closed-loop effect,
+and the visual test — occluding the target during approach in the arrangement
+that works — has not been run.
 
 ### A different bottleneck
 
@@ -851,11 +875,12 @@ rather than about perception or policy class.
 - That SmolVLA beats ACT. Both differences are within noise at these sample
   sizes, and the two families ran under different controllers because a shared
   one would have handicapped SmolVLA. Controller and policy are confounded.
-- That the 0/5 in the swapped arrangement is mode collapse rather than occlusion.
-  The wrist view is undegraded and the failures never reached the release, which
-  excludes both occlusions this project has previously measured, but the red cube
-  does sit between the gripper and the target there. The teacher-forced
-  comparison that separates them has not run.
+- That approach-time occlusion is what breaks the swapped arrangement. Mode
+  collapse is excluded — the checkpoint fits that arrangement to within 22% of
+  the one it succeeds in — and the degradation sits in the two joints that set
+  reach and height, which is what losing a depth cue would cost. But no trial has
+  manipulated that occlusion directly, so the mechanism is inferred from where
+  the error concentrates, not measured.
 - That either family would do better under the other's controller. Both were
   run both ways: asynchrony took SmolVLA from 0/5 to 3/5 and left ACT at 1/5
   against 2/8 while adding stalls it never showed synchronously. The confound is
@@ -988,7 +1013,7 @@ hashes before the publication status is changed from `local_only`.
 | ACT v2 checkpoints | Both final checkpoints on Jetson; v2-50 trained in the isolated A4500 workspace | Training and contract verification complete; Hub publication and physical evaluation pending |
 | Dual-camera 20ep dataset + checkpoint | Jetson cache; A4500 `datasets/` and `outputs/train/` | Complete; 0/6 physical outcomes recorded in this report only, never logged to CSV at the time |
 | Vertical 20ep dataset + checkpoint | Jetson cache; A4500; wrist-only ablation copy alongside | Complete; both variants physically tested |
-| Teacher-forced diagnostic summaries | A4500, pulled locally for the four-way comparison | Numbers reproduced in this report; raw summaries not yet committed |
+| Teacher-forced diagnostic summaries | A4500: four ACT checkpoints, plus `combined-40` SmolVLA against both training layouts | Numbers reproduced in this report; raw summaries not yet committed |
 | Vertical physical trials (n=20, n=100, ensembling, n=50) | Recorded eval episodes on the Jetson; outcomes narrated per trial | Reported here; not yet normalized into `trials.csv` |
 | Red-left 20ep dataset | Jetson cache; transferred to A4500 and load-verified | Collection complete; Hub publication pending |
 | Combined 40ep dataset | A4500 `datasets/..._vertical_combined_40ep`, 40 eps / 23,920 frames | Built by `merge_two_datasets.py`; load-verified |
@@ -1062,12 +1087,13 @@ Ordered by what would change a conclusion, not by effort.
    positions.** The current set sits within about 6 px of one configuration, so
    its 5/5 grasp rate says nothing about spatial generalisation. Do not merge
    them with the earlier layout.
-4. **Separate mode collapse from approach-time occlusion.** The merged
-   checkpoint scored 0/5 in the arrangement it was equally trained on. Running
-   the teacher-forced diagnostic against both datasets settles it without
-   touching the robot: similar fitting error means the modes were learned and the
-   failure is closed-loop, markedly worse means they were not. The diagnostic now
-   runs on SmolVLA; the host's filesystem is full.
+4. **Test the approach-time occlusion directly.** Mode collapse is excluded —
+   the merged checkpoint fits the arrangement it fails in to within 22% of the
+   one it succeeds in — so its 0/5 there is closed-loop, and the error
+   concentrates in the two joints that set reach and height. The cheap
+   manipulation is to place the red cube so it occludes the target during the
+   approach **in the arrangement that works**: if that arm drops too, the
+   mechanism is confirmed without training anything.
 5. **Re-run the front-camera ablation properly paired at n=100**, scored with a
    recovery-aware metric — attempts per grasp, time to first stable grasp —
    rather than teacher-forced error, which finding #2 showed ranks it backwards.
