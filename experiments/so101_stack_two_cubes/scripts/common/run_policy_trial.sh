@@ -155,7 +155,7 @@ if [[ "$use_async" == true ]]; then
   # transformers than the conda environment, and under it lerobot's groot config
   # fails to even define itself, so importing the policy factory raises. Every
   # other entry point in this project sets it; these two were missed.
-  server_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" -m lerobot.async_inference.policy_server
+  server_cmd=(env PYTHONNOUSERSITE=1 "$python_bin" "$script_dir/async_policy_server.py"
     --host=127.0.0.1 "--port=$server_port" "--fps=$fps")
   # Not "-m lerobot.async_inference.robot_client": that module leaves the robot and
   # camera registries empty, so draccus rejects every --robot.type. The wrapper
@@ -180,18 +180,30 @@ if [[ "$use_async" == true ]]; then
 
   mkdir -p "$repo_root/outputs/eval_latency"
   server_log="$repo_root/outputs/eval_latency/${run_id}_server.log"
-  "${server_cmd[@]}" > "$server_log" 2>&1 &
-  server_pid=$!
-  trap 'kill "$server_pid" 2>/dev/null' EXIT INT TERM
-  for _ in $(seq 1 30); do
-    "$python_bin" -c "
+
+  port_open() {
+    env PYTHONNOUSERSITE=1 "$python_bin" -c "
 import socket,sys
 s=socket.socket(); s.settimeout(0.5)
-sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)" && break
-    sleep 1
-  done
-  kill -0 "$server_pid" 2>/dev/null || { echo "Policy server died; see $server_log" >&2; exit 1; }
-  echo "policy server up (pid $server_pid, log $server_log)"
+sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)"
+  }
+
+  # A server already listening is reused and left running. It keeps the
+  # checkpoint in memory, so the next trial starts moving in seconds instead of
+  # waiting out another load.
+  server_pid=""
+  if port_open; then
+    echo "reusing the policy server already on 127.0.0.1:$server_port"
+  else
+    "${server_cmd[@]}" > "$server_log" 2>&1 &
+    server_pid=$!
+    trap 'kill "$server_pid" 2>/dev/null' EXIT INT TERM
+    for _ in $(seq 1 30); do port_open && break; sleep 1; done
+    kill -0 "$server_pid" 2>/dev/null || { echo "Policy server died; see $server_log" >&2; exit 1; }
+    echo "policy server started (pid $server_pid, log $server_log)"
+    echo "  it stops with this trial. To keep it warm across trials, start it yourself:"
+    echo "    env PYTHONNOUSERSITE=1 $python_bin $script_dir/async_policy_server.py --host=127.0.0.1 --port=$server_port --fps=$fps &"
+  fi
   # The server loads the checkpoint when the client first connects; SmolVLA took
   # 39 s of it on the Jetson. Timing the trial from process start charges that to
   # the robot and makes every trial a different length, which is not comparable
@@ -200,7 +212,7 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)" && break
   client_log="$repo_root/outputs/eval_latency/${run_id}_client.log"
   "${client_cmd[@]}" > "$client_log" 2>&1 &
   client_pid=$!
-  trap 'kill "$client_pid" "$server_pid" 2>/dev/null' EXIT INT TERM
+  trap 'kill "$client_pid" 2>/dev/null; [[ -n "$server_pid" ]] && kill "$server_pid" 2>/dev/null' EXIT INT TERM
 
   for _ in $(seq 1 300); do
     grep -q "Control loop thread starting" "$client_log" 2>/dev/null && break
@@ -214,7 +226,7 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)" && break
   echo "robot is moving -- ${episode_time_s}s trial starts now"
   sleep "$episode_time_s"
   kill "$client_pid" 2>/dev/null; sleep 2
-  kill "$server_pid" 2>/dev/null
+  [[ -n "$server_pid" ]] && kill "$server_pid" 2>/dev/null
 
   # A killed client never reaches its disconnect, so disable_torque_on_disconnect
   # never fires and the arm is left rigid -- it cannot be repositioned by hand for
