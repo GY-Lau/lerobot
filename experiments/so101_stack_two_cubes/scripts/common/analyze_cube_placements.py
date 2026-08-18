@@ -61,7 +61,21 @@ def _color_mask(image_rgb: np.ndarray, color: str) -> np.ndarray:
     return cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
 
 
-def detect_cube(image_rgb: np.ndarray, color: str, min_area_px: int = 500) -> Detection:
+def detect_cube(
+    image_rgb: np.ndarray,
+    color: str,
+    min_area_px: int = 500,
+    ignore_clipped_rivals: bool = False,
+) -> Detection:
+    """Locate the largest blob of `color`.
+
+    `ambiguous` warns that a second blob is close enough in size that the wrong
+    one may have been picked. Fixtures at the edge of frame -- a wall socket, a
+    table edge -- can trip that even though a partially visible blob can never be
+    the cube: the caller already requires the cube to be fully in frame. Pass
+    `ignore_clipped_rivals=True` to leave border-touching blobs out of that
+    comparison. It defaults to False so dataset audits stay reproducible.
+    """
     if image_rgb.ndim != 3 or image_rgb.shape[2] != 3:
         raise ValueError(f"Expected an HxWx3 RGB image, got {image_rgb.shape}")
 
@@ -78,7 +92,14 @@ def detect_cube(image_rgb: np.ndarray, color: str, min_area_px: int = 500) -> De
         raise ValueError(f"No {color} component of at least {min_area_px} pixels was found")
 
     area, index = components[0]
-    second_area = components[1][0] if len(components) > 1 else 0
+    rivals = components[1:]
+    if ignore_clipped_rivals:
+        height_, width_ = image_rgb.shape[:2]
+        def _clipped(i: int) -> bool:
+            x, y, w, h = (int(stats[i, k]) for k in range(4))
+            return x <= 0 or y <= 0 or x + w >= width_ or y + h >= height_
+        rivals = [(a, i) for a, i in rivals if not _clipped(i)]
+    second_area = rivals[0][0] if rivals else 0
     x, y = (float(value) for value in centroids[index])
     bbox = tuple(int(value) for value in stats[index, :4])
     height, width = image_rgb.shape[:2]

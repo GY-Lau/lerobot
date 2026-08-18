@@ -30,9 +30,12 @@
 #   EVAL_FPS               control rate           (default 30)
 #   EVAL_EPISODE_TIME_S    trial length           (default 40)
 #   EVAL_CHUNK_THRESHOLD   async: request the next chunk once the remaining
-#                          fraction of the queue drops to this (default 0.9;
-#                          LeRobot's own default of 0.5 leaves too little
-#                          runway for a 1.85 s refresh)
+#                          fraction of the queue drops to this (default 1.0,
+#                          i.e. immediately). Anything lower spends part of the
+#                          runway before asking: at 0.9 the client waits for 5
+#                          of 50 actions to be consumed, which at 25 fps leaves
+#                          1.8 s to cover a 1.85 s refresh, and the arm stalls.
+#                          LeRobot's own default is 0.5.
 #   EVAL_SERVER_PORT       async policy server port (default 8080)
 #   EVAL_SKIP_WRIST_CHECK  set to 1 to skip the start-scene gate
 
@@ -68,7 +71,7 @@ python_bin="${LEROBOT_PYTHON:-/home/hai/miniconda3/envs/lerobot/bin/python}"
 record_bin="${LEROBOT_RECORD_BIN:-$(dirname -- "$python_bin")/lerobot-record}"
 fps="${EVAL_FPS:-30}"
 episode_time_s="${EVAL_EPISODE_TIME_S:-40}"
-chunk_threshold="${EVAL_CHUNK_THRESHOLD:-0.9}"
+chunk_threshold="${EVAL_CHUNK_THRESHOLD:-1.0}"
 server_port="${EVAL_SERVER_PORT:-8080}"
 
 TASK='Stack the yellow cube on top of the red cube'
@@ -189,11 +192,31 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)" && break
   done
   kill -0 "$server_pid" 2>/dev/null || { echo "Policy server died; see $server_log" >&2; exit 1; }
   echo "policy server up (pid $server_pid, log $server_log)"
-  timeout "$(( episode_time_s + 30 ))" "${client_cmd[@]}"
-  status=$?
+  # The server loads the checkpoint when the client first connects; SmolVLA took
+  # 39 s of it on the Jetson. Timing the trial from process start charges that to
+  # the robot and makes every trial a different length, which is not comparable
+  # with the fixed-horizon ACT trials. Wait for the control loop to announce
+  # itself, then start the clock.
+  client_log="$repo_root/outputs/eval_latency/${run_id}_client.log"
+  "${client_cmd[@]}" > "$client_log" 2>&1 &
+  client_pid=$!
+  trap 'kill "$client_pid" "$server_pid" 2>/dev/null' EXIT INT TERM
+
+  for _ in $(seq 1 300); do
+    grep -q "Control loop thread starting" "$client_log" 2>/dev/null && break
+    kill -0 "$client_pid" 2>/dev/null || break
+    sleep 1
+  done
+  if ! grep -q "Control loop thread starting" "$client_log" 2>/dev/null; then
+    echo "The control loop never started; see $client_log and $server_log" >&2
+    exit 1
+  fi
+  echo "robot is moving -- ${episode_time_s}s trial starts now"
+  sleep "$episode_time_s"
+  kill "$client_pid" 2>/dev/null; sleep 2
   kill "$server_pid" 2>/dev/null
-  (( status == 0 || status == 124 )) || { echo "Client exited with $status" >&2; exit "$status"; }
-  echo "Trial finished. Nothing was recorded; log the outcome with common/log_trial.py."
+  echo "Trial finished after ${episode_time_s}s of motion. Nothing was recorded;"
+  echo "log the outcome with common/log_trial.py."
   exit 0
 fi
 

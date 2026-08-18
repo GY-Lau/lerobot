@@ -74,7 +74,7 @@ def evaluate(image_rgb: np.ndarray, margin: int, min_area: int) -> tuple[bool, d
     for color in ("red", "yellow"):
         entry: dict = {"found": False, "complete": False, "flags": []}
         try:
-            det = detect_cube(image_rgb, color, min_area_px=min_area)
+            det = detect_cube(image_rgb, color, min_area_px=min_area, ignore_clipped_rivals=True)
         except ValueError as error:
             entry["flags"].append("missing")
             entry["error"] = str(error)
