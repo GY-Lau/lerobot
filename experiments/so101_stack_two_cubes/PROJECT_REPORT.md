@@ -12,8 +12,8 @@ checkpoint is not presented as proof of task success.
 
 ## Findings
 
-Six results, each with the number that supports it and the limit that qualifies
-it. The rest of this report is the evidence behind them.
+Eight results, each with the number that supports it and the limit that
+qualifies it. The rest of this report is the evidence behind them.
 
 **1. Observability is a property of the whole rig, not of the camera.** The
 recurring failure was never the policy forgetting the task; it was missing
@@ -66,6 +66,27 @@ the light off completed **0/3** grasps; lit, the same checkpoint completed
 **5/5**. That is the largest single-factor effect measured anywhere in this
 project, and it came from a variable nobody was controlling. The pre-trial gates
 check that both cubes are visible; they do not check illumination.
+
+**7. A policy has to be executed continuously, and a shared controller is not
+automatically a fair one.** Running SmolVLA through the same synchronous loop as
+ACT scored **0/5**, failing at approach — it could not line up over the cube.
+The same checkpoint asynchronously scored **3/5**, failing only at placement.
+The cause is arithmetic, not policy: inference is 1.255 s against 1.67 s of
+chunk playback, so the arm freezes 43% of the time, and **the demonstrations
+contain no pauses**. ACT is immune because its inference is 15 ms against 3.3 s,
+so "both synchronous" handicaps one side only. Halving the chunk to 25 steps
+reacted faster and still failed, which rules out replanning frequency and leaves
+continuity.
+
+**8. A sampling policy did not reproduce the averaging failure.** On the merged
+`combined-40` that cost ACT everything (0/6, releasing short of the target),
+SmolVLA scored **2/5**, and none of its failures were that: they were placing
+correctly then knocking the cube off, releasing from too high, and correcting
+mid-placement. **Every error was at the target or after it, never short of it.**
+The merge cost ACT 2/8 to 0/6 and cost SmolVLA nothing measurable (3/5 to 2/5,
+p = 1.00). Caveat: no pair here is statistically separated, and the two families
+ran under different controllers precisely because a shared one would not have
+been fair — so controller and policy class are confounded.
 
 What none of this establishes yet is in
 [Claims not yet supported](#claims-not-yet-supported) — every headline here rests
@@ -130,7 +151,9 @@ other**. That coincidence is convenient, not engineered.
 | Illumination sensitivity | Grasp completed in 5/5 lit trials and 0/3 unlit trials of the same checkpoint | Identified from an uncontrolled change during evaluation | Re-run the three unlit trials lit; then either fix lighting in the protocol or record varied-illumination data |
 | Diffusion comparison | Same 30 episodes and 60k sampled-frame budget; 30k checkpoint complete | Training complete; not real time under LeRobot's *synchronous* loop, which is the only controller tested | Either an asynchronous controller (chunk N+1 generated while N executes) or a disclosed non-Jetson inference setup |
 | Jetson latency | Four Diffusion inference configurations with retained log hashes and refresh/cached timing | Complete for the measured configurations | Optional future asynchronous or smaller-policy experiment |
-| SmolVLA vs ACT (single task) | Both arms of a 2x2: red-left 20 and combined 40, same batch/steps/seed as ACT, each side on its own published hyperparameters | Both training on the A4500 under the released recipe | Jetson latency measurement, then physical trials under the ACT protocol. The combined-40 arm is the one that tests the multimodality claim |
+| SmolVLA vs ACT (single task) | Both arms trained and physically evaluated; 20 trials in `trials.csv`; server-side inference measured at p50 1.255 s | 2x2 complete: SmolVLA 3/5 on red-left and 2/5 on combined against ACT's 2/8 and 0/6, with none of its failures showing ACT's release-short signature | Larger samples; ACT has not been run asynchronously, so controller and policy remain confounded |
+| Controller and execution continuity | Same SmolVLA checkpoint, same scene, same session: 0/5 synchronous against 3/5 asynchronous, plus an n_action_steps=25 control that also failed | Complete; the duty-cycle arithmetic (57% in motion synchronously against ACT's 100%) explains it | None for the mechanism; ACT asynchronously would show whether the effect is symmetric |
+| Jetson power mode | MAXN_SUPER with jetson_clocks against the 25 W default, identical weights | Refresh 1,847 ms to 1,070 ms, a 42% reduction | None; it is now held fixed for every SmolVLA trial |
 | SmolVLA PEFT (language) | Two-task protocol, pinned base and processor/config manifests, role-aligned layout gate, merge gate, LoRA launcher, four-condition evaluator, and isolated Jetson environment check | Infrastructure ready | Record and audit 30 real inverse-task demonstrations, then smoke test and train |
 | Voice control | Text-first evaluation matrix and ASR error-separation design | Designed only | Requires a language-grounded model that first passes typed prompts |
 
@@ -642,64 +665,131 @@ ceiling.
 
 The multimodality result above leaves two levers: make the target observable, or
 use a policy class that samples from the action distribution instead of returning
-its mean. SmolVLA's flow-matching head is the second lever. Testing it needs no
-new data, but it does need **two** runs, because two different questions are
-easily confused here:
+its mean. SmolVLA's flow-matching head is the second lever, and testing it takes
+no new data — both datasets already exist. Two questions are easily confused
+here, and only one of them is about multimodality:
 
-- **Does a pretrained VLA beat a from-scratch ACT on 20 demonstrations?** Answered
-  on `redleft-20`, which sits close to a single target layout.
-- **Does sampling instead of averaging fix the multimodality failure?** Only
-  answerable on `combined-40`, where the two layouts do not overlap. This is the
-  dataset ACT averaged on and scored 0/6. **Red-left cannot test it**, because
-  there is no second mode there to average over.
+- **Does a pretrained VLA beat a from-scratch ACT on 20 demonstrations?**
+  Answered on `redleft-20`, which sits close to a single target layout.
+- **Does sampling instead of averaging survive the merge that broke ACT?**
+  Only answerable on `combined-40`, where the two layouts do not overlap. This
+  is the dataset ACT scored 0/6 on by releasing between the modes. **Red-left
+  cannot test it**, because there is no second mode there to average over.
 
-Both arms run the same recipe against the ACT numbers already measured, so the
-comparison is a 2x2 with data and policy as the two factors:
+Both arms ran the same recipe: the released checkpoint's own config, batch 8,
+30,000 steps, seed 1000, no hyperparameter overrides — the ACT contract as well.
 
-| | ACT | SmolVLA |
+### The controller has to be chosen before the policies can be compared
+
+The obvious plan, run both families synchronously as the ACT trials were, turns
+out to handicap only one of them. Inference cost relative to chunk playback
+decides how much of a trial the arm spends moving:
+
+| Policy | Inference | Chunk playback at 30 fps | Time in motion |
+| --- | ---: | ---: | ---: |
+| ACT | 15 ms | 3.33 s (100 steps) | **100%** |
+| SmolVLA | 1,255 ms | 1.67 s (50 steps) | **57%** |
+
+ACT's synchronous loop is continuous; 15 ms against 3.3 s is nothing. SmolVLA's
+freezes for 1.25 s out of every 2.9 — and **the demonstrations contain no
+pauses**, so stop-start execution is out of distribution in a dimension nobody
+had been tracking.
+
+The trials say the same thing. Same checkpoint, same data, same session, same
+scene, only the controller changed:
+
+| Controller | Result | Where it failed |
+| --- | ---: | --- |
+| Synchronous, `n_action_steps` 50 | **0/5** | approach and grasp — could not line up over the cube |
+| Synchronous, `n_action_steps` 25 | 0/1 | quicker to react, still could not line up |
+| Asynchronous | **3/5** | placement and retreat, never approach |
+
+The `n=25` control matters: halving the chunk halves the blind stretch but not
+the freeze, since inference costs the same either way, and the duty cycle drops
+from 57% to 40% moving. It failed the same way. That rules out replanning
+frequency as the explanation and leaves **motion continuity**.
+
+So a synchronous SmolVLA number is not a policy result. Asynchronous inference —
+generating chunk N+1 while N executes — is one of the SmolVLA paper's own
+contributions, so the asynchronous arm is the policy run as designed, and the
+synchronous 0/5 is the off-design case. Every SmolVLA number below is
+asynchronous at 30 fps.
+
+Two Jetson settings had to be right first. **MAXN_SUPER with `jetson_clocks`
+cut refresh from 1,847 ms to 1,070 ms, a 42% reduction on identical weights**,
+and `HF_HUB_OFFLINE` stopped a Hub lookup for a config already on disk from
+blocking on a host with no route to it. Measured server-side inference across a
+real trial then settled at p50 **1.255 s** (p95 1.274, n=31) against 1.667 s of
+runway, so 30 fps became reachable and the comparison could hold frequency
+fixed against ACT.
+
+### The 2x2
+
+Twenty physical trials, all logged to `results/trials.csv` with failure labels:
+
+| | ACT (synchronous) | SmolVLA (asynchronous) |
 | --- | ---: | ---: |
-| `redleft-20` (near single layout) | 2/5 | running |
-| `combined-40` (two disjoint layouts) | **0/6** | running |
+| `redleft-20` (near single layout) | 2/8 (25%) | **3/5 (60%)** |
+| `combined-40` (two disjoint layouts) | **0/6 (0%)** | **2/5 (40%)** |
 
-The bottom row carries the argument. If SmolVLA holds up on the merged data where
-ACT released between the modes, "sample rather than average" stops being a claim
-repeated from a paper and becomes a measurement. If it fails the same way, the
-binding constraint is perception rather than policy class, and no head fixes it.
-Both outcomes are informative, which is what makes it worth the GPU time.
+No pair is statistically separated: ACT versus SmolVLA on the merged data is
+Fisher p ≈ 0.18, and SmolVLA's own 3/5 against 2/5 is p = 1.00. What the counts
+do show is that **the merge that cost ACT everything cost SmolVLA nothing
+measurable**.
 
-Neither arm is the language experiment below; both are single-task.
+### The failure modes are the evidence, not the counts
 
-| | ACT | SmolVLA |
-| --- | --- | --- |
-| Data | redleft 20 / 11,960 frames, and combined 40 / 23,920 | same two datasets |
-| Method | full fine-tune (ACT trains from scratch) | `freeze_vision_encoder` + `train_expert_only`, the released config's own setting |
-| Batch x steps | 8 x 30,000 | 8 x 30,000 |
-| Seed | 1000 | 1000 |
-| Hyperparameters | LeRobot/paper defaults, no overrides | released checkpoint config, no overrides |
+ACT's failure on `combined-40` was specific: it grasped normally (5/6) and then
+released **short of the red cube, without reaching even its edge**. That is the
+interpolation signature, and the report backs it with zero overlap on the red
+cube's image v-axis and a release-phase bias ratio of 0.92.
 
-Getting there required two corrections worth recording, because both would
-silently produce a misleading comparison rather than an error:
+SmolVLA's three failures on the same data are not that:
 
-- The project's SmolVLA launcher had been written around LoRA and hard-overrode
-  the published optimizer settings — learning rate 1e-3 against the checkpoint's
-  1e-4, decay 1e-4 against 2.5e-6. Those suit an adapter, not this. SmolVLA is
-  already parameter-efficient by its own config, which freezes the vision encoder
-  and trains only the action expert, so the adapter was redundant as well.
-- The released checkpoint's `policy_preprocessor.json` hardcodes `tokenizer_name`
-  as a **Hub id**, which `--policy.vlm_model_name` does not override. On a host
-  with no route to huggingface.co that lookup can only be served from the local
-  hub cache, and downloading the backbone with `local_dir=` does not populate it.
-  The first scheduled run died here. The processor now lives in the hub cache
-  with `refs/main` pinned to the same verified revision.
+| Trial | Failure | Nature of the error |
+| ---: | --- | --- |
+| 1 | Placed correctly, then failed to lift clear and knocked the cube off | placement was **on target** |
+| 3 | Released from too high; the cube bounced off | **height**, not lateral |
+| 4 | Placement off, while visibly correcting | near the target, adjusting |
 
-The first scheduled attempt aborted in its smoke stage and never started the full
-run, which is what that gate is for.
+**None of them released short of the target.** Every error is at the target or
+in the motion after it. The averaging signature does not appear, which is what
+the arm was run to find out.
 
-Physical evaluation will use the same protocol as ACT: the pose and wrist-view
-gates, `n_action_steps` at the value locked above, room light on. **Jetson
-inference latency has to be measured before those trials, not after** — the
-Diffusion Policy comparison in this report was confounded exactly that way, and
-SmolVLA is a ~450M-parameter model with a VLM backbone on an Orin NX.
+Two trials also showed something ACT never did on this data: the policy
+**re-aligned above the cube before descending** (trial 2) and **corrected while
+placing** (trial 4). That is the closed-loop recovery finding #2 identified as
+invisible to teacher-forced error, now appearing in the policy class that was
+predicted to have it.
+
+### A different bottleneck
+
+Across both SmolVLA arms, ten trials, the failures cluster **after** the cube is
+positioned: not lifting clear on the way out, releasing from too high, a gripper
+that opened, closed and opened again at release in two red-left trials. Grasping
+is largely solved; `post_success_disturbance` earned its first real use.
+
+That is a different problem from ACT's, which was placing accurately at all. It
+also suggests the next intervention is about the release and retreat phase
+rather than about perception or policy class.
+
+### What this does not establish
+
+- That SmolVLA beats ACT. Both differences are within noise at these sample
+  sizes, and the two families ran under different controllers because a shared
+  one would have handicapped SmolVLA. Controller and policy are confounded.
+- That the ACT numbers would survive the same treatment. ACT has not been run
+  asynchronously; its synchronous loop is already continuous, so the change
+  should matter less, but that is an argument, not a measurement.
+- That the pretrained prior is doing the work. SmolVLA's pretraining is
+  SO-100 community data and this is an SO-101, which is close, but the wrist
+  camera here is mounted rotated 90 degrees from upright and the two cameras
+  occupy the slots pretraining used for a top-down and a wrist view. A probe on
+  the base checkpoint showed slot assignment moves its output by about a quarter
+  of what changing the scene does, so the prior is being consumed off-nominal by
+  an unmeasured amount.
+- That any of this transfers off this hardware. Every number here depends on a
+  1.255 s inference cost that is a property of an Orin NX in MAXN.
 
 ## SmolVLA language-control experiment
 
@@ -858,7 +948,21 @@ hashes before the publication status is changed from `local_only`.
   within a 0.009-wide band of normalized image u, roughly 6 pixels, so 5/5
   grasping was measured on a nearly fixed start configuration;
 - that the red-left layout improves placement. The occlusion fix is verified in
-  recorded video; its effect on success is untested.
+  recorded video; its effect on success is untested;
+- that SmolVLA outperforms ACT. Every pair is within noise at these sample sizes
+  (Fisher p 0.18 on the merged data), and the two families necessarily ran under
+  different controllers, so controller and policy class are confounded;
+- that ACT would not also improve asynchronously. It has not been run that way.
+  Its synchronous loop is already continuous, so the change should matter less,
+  but that is an argument rather than a measurement;
+- that SmolVLA's pretrained prior is what produced the difference. Its
+  pretraining is SO-100 community data and this is an SO-101, but the wrist
+  camera is mounted rotated 90 degrees from upright and both cameras sit in slots
+  pretraining used for other views. A probe on the base checkpoint moved its
+  output by about a quarter of a scene change when the slot assignment changed,
+  so the prior is being consumed off-nominal by an unmeasured amount;
+- that any latency conclusion here transfers off this hardware. Every number
+  depends on a 1.255 s inference cost specific to an Orin NX in MAXN.
 
 ## Next evidence gates
 
@@ -877,10 +981,10 @@ Ordered by what would change a conclusion, not by effort.
    positions.** The current set sits within about 6 px of one configuration, so
    its 5/5 grasp rate says nothing about spatial generalisation. Do not merge
    them with the earlier layout.
-4. **Finish the SmolVLA comparison**: measure Jetson inference latency *before*
-   physical trials, then run the same protocol as ACT. A policy that samples from
-   the action distribution is the principled answer to finding #5, and the
-   Diffusion section shows what happens when latency is checked afterwards.
+4. **Run ACT asynchronously.** It is the one cell that would remove the
+   controller confound from the SmolVLA comparison, and finding #3 predicts it
+   could go either way: async replans more often, and this policy degraded the
+   more often it replanned. Either outcome settles something.
 5. **Re-run the front-camera ablation properly paired at n=100**, scored with a
    recovery-aware metric — attempts per grasp, time to first stable grasp —
    rather than teacher-forced error, which finding #2 showed ranks it backwards.
