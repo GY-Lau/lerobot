@@ -56,6 +56,7 @@ FIELDNAMES = [
     "instruction_following_success",
     "failure_label",
     "completion_time_s",
+    "scoring",
     "video_path",
     "notes",
 ]
@@ -96,6 +97,13 @@ def classify_outcome(
 
 
 def validate_recorded_episode(dataset_root: Path, trial_index: int) -> None:
+    """Refuse to log a trial whose episode was never recorded.
+
+    Only meaningful for a synchronous trial, which records a dataset. The
+    asynchronous controller the language matrix runs under has no dataset code
+    at all, so there is nothing to check and --live-scored says so explicitly
+    rather than letting the check be silently skipped.
+    """
     info_path = dataset_root / "meta" / "info.json"
     if not info_path.is_file():
         return
@@ -133,6 +141,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--notes", default="")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--dataset-root", type=Path)
+    parser.add_argument(
+        "--live-scored",
+        action="store_true",
+        help=(
+            "The trial ran under the asynchronous controller, which records no "
+            "episode, and was scored by watching the robot. Skips the "
+            "recorded-episode check and records how the trial was scored."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -154,7 +171,8 @@ def main() -> int:
         / "GY-William"
         / f"eval_smolvla_{args.condition}"
     )
-    validate_recorded_episode(dataset_root, trial_index)
+    if not args.live_scored:
+        validate_recorded_episode(dataset_root, trial_index)
 
     append_row(
         args.output,
@@ -171,6 +189,7 @@ def main() -> int:
             "completion_time_s": (
                 "" if args.completion_time_s is None else args.completion_time_s
             ),
+            "scoring": "live" if args.live_scored else "recorded",
             "video_path": args.video_path,
             "notes": args.notes,
         },

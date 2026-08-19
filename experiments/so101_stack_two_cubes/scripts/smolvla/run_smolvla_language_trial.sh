@@ -1,149 +1,157 @@
 #!/usr/bin/env bash
+# One SmolVLA language-control trial: same scene, one prompt, asynchronous.
+#
+# This is a thin wrapper around scripts/common/run_policy_trial.sh. Everything
+# about driving the robot -- gates, cameras, controller, torque release -- lives
+# there and is shared with every other physical trial in this project. What is
+# specific to the language experiment, and therefore lives here, is the prompt
+# for each condition and the 10-trial cap that keeps the 4x10 matrix balanced.
+#
+# Asynchronous, not synchronous. The earlier version of this script drove the
+# robot through lerobot-record, the same synchronous loop under which this
+# project measured SmolVLA at 0/5 -- the arm is frozen 43% of the time because
+# a 1.255 s inference does not fit inside a 1.67 s chunk. Running the language
+# matrix that way would have produced near-zero manipulation success in both
+# color orders, and instruction-following cannot be scored at all when the robot
+# never completes a stack either way. The 40 trials would have measured the
+# controller.
+#
+# The consequence is that there is no recorded episode to review afterwards:
+# the async client has no dataset code. Language trials are scored live, and
+# log_smolvla_language_trial.py must be told so with --live-scored.
+#
+# Usage:
+#   run_smolvla_language_trial.sh [--dry-run] CONDITION [TRAIN_RUN] [CHECKPOINT]
+#
+# CONDITION:
+#   yellow_exact       Stack the yellow cube on top of the red cube
+#   yellow_paraphrase  Put the yellow block on the red block
+#   red_exact          Stack the red cube on top of the yellow cube
+#   red_paraphrase     Put the red block on the yellow block
+#
+# The paraphrase conditions are what separate "learned the language" from
+# "memorised one string", so they are not optional.
+#
+# Defaults:
+#   TRAIN_RUN=smolvla_expert_two_orders_60ep_b8_30k   CHECKPOINT=030000
+#
+# That default is the released SmolVLA recipe at this project's training
+# contract -- 30k steps, batch 8, seed 1000, expert_only -- so the language arm
+# is comparable with smolvla_redleft and smolvla_combined. The older plan in
+# docs/smolvla_peft.md named a rank-16 LoRA at 20k/batch 1; that would train
+# fine but could not be set beside the other two arms.
+#
+# The horizon is pinned to 40 s, not the 20 s in docs/smolvla_peft.md. That 20 s
+# predates the asynchronous controller and was chosen against ~20 s
+# demonstrations; every SmolVLA arm actually evaluated in this project ran at
+# 40 s. A horizon too short to finish a stack would depress manipulation success
+# in both colour orders and confound the thing being measured, which is which
+# order the robot chooses. Override with EVAL_EPISODE_TIME_S, but override it
+# for every condition or the matrix is not balanced.
+#
+# Env: everything run_policy_trial.sh accepts.
 
-set -euo pipefail
+set -uo pipefail
 
-usage() {
-  cat <<'EOF'
-Usage:
-  run_smolvla_language_trial.sh [--dry-run] CONDITION [TRAIN_RUN] [CHECKPOINT]
-
-CONDITION must be one of:
-  yellow_exact       Stack the yellow cube on top of the red cube
-  yellow_paraphrase  Put the yellow block on the red block
-  red_exact          Stack the red cube on top of the yellow cube
-  red_paraphrase     Put the red block on the yellow block
-
-Defaults:
-  TRAIN_RUN=smolvla_lora_r16_two_orders_20k
-  CHECKPOINT=020000
-
-Each invocation records one 20-second evaluation episode. Reusing a condition
-appends to its dataset, allowing 10 matched trials per condition.
-EOF
-}
+usage() { awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0"; }
 
 dry_run=false
-if [[ "${1:-}" == "--dry-run" ]]; then
-  dry_run=true
-  shift
-fi
-if [[ $# -lt 1 || $# -gt 3 ]]; then
-  usage >&2
-  exit 2
-fi
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --dry-run) dry_run=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown flag: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+if [[ $# -lt 1 || $# -gt 3 ]]; then usage >&2; exit 2; fi
 
 condition="$1"
-train_run="${2:-smolvla_lora_r16_two_orders_20k}"
-checkpoint="${3:-020000}"
+train_run="${2:-smolvla_expert_two_orders_60ep_b8_30k}"
+checkpoint="${3:-030000}"
 
 case "$condition" in
-  yellow_exact)
-    prompt='Stack the yellow cube on top of the red cube'
-    ;;
-  yellow_paraphrase)
-    prompt='Put the yellow block on the red block'
-    ;;
-  red_exact)
-    prompt='Stack the red cube on top of the yellow cube'
-    ;;
-  red_paraphrase)
-    prompt='Put the red block on the yellow block'
-    ;;
+  yellow_exact)      prompt='Stack the yellow cube on top of the red cube' ;;
+  yellow_paraphrase) prompt='Put the yellow block on the red block' ;;
+  red_exact)         prompt='Stack the red cube on top of the yellow cube' ;;
+  red_paraphrase)    prompt='Put the red block on the yellow block' ;;
   *)
     echo "Unknown CONDITION: $condition" >&2
     usage >&2
-    exit 2
-    ;;
+    exit 2 ;;
 esac
 
 if [[ ! "$train_run" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-  echo "TRAIN_RUN may contain only letters, numbers, dot, underscore, and hyphen." >&2
+  echo "TRAIN_RUN may contain only letters, numbers, dot, underscore and hyphen." >&2
   exit 2
 fi
 if [[ ! "$checkpoint" =~ ^[0-9]{6}$ ]]; then
-  echo "CHECKPOINT must be six digits, for example 020000." >&2
+  echo "CHECKPOINT must be six digits, for example 030000." >&2
   exit 2
 fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 experiment_dir="$(cd -- "$script_dir/../.." && pwd)"
-repo_root="$(cd -- "$experiment_dir/../.." && pwd)"
 python_bin="${LEROBOT_PYTHON:-/home/hai/miniconda3/envs/lerobot/bin/python}"
-record_bin="$(dirname -- "$python_bin")/lerobot-record"
-model="$repo_root/outputs/train/$train_run/checkpoints/$checkpoint/pretrained_model"
-run_id="eval_smolvla_$condition"
-dataset_repo="GY-William/$run_id"
-dataset_base="${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}"
-dataset_root="$dataset_base/$dataset_repo"
-latency_log="$repo_root/outputs/eval_latency/$run_id.csv"
+trials_csv="$experiment_dir/results/smolvla_language_trials.csv"
 
-export PYTHONNOUSERSITE=1
-
-record_cmd=(
-  "$record_bin"
-  --robot.type=so101_follower
-  --robot.port=/dev/ttyACM0
-  --robot.id=lerobot_follower_arm
-  '--robot.cameras={"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"}}'
-  "--policy.path=$model"
-  --policy.device=cuda
-  --policy.use_amp=true
-  --policy.push_to_hub=false
-  "--dataset.repo_id=$dataset_repo"
-  "--dataset.root=$dataset_root"
-  "--dataset.single_task=$prompt"
-  --dataset.num_episodes=1
-  --dataset.episode_time_s=20
-  --dataset.reset_time_s=0
-  --dataset.fps=30
-  --dataset.push_to_hub=false
-  --display_data=false
-  "--latency_log_path=$latency_log"
-  --latency_warmup_frames=30
-)
-
-if [[ -f "$dataset_root/meta/info.json" ]]; then
-  if ! "$dry_run"; then
-    recorded_episodes="$("$python_bin" -c '
-import json
-import sys
-print(int(json.load(open(sys.argv[1], encoding="utf-8"))["total_episodes"]))
-' "$dataset_root/meta/info.json")"
-    if (( recorded_episodes >= 10 )); then
-      echo "Condition $condition already has $recorded_episodes/10 episodes; refusing trial 11." >&2
-      exit 1
-    fi
-  fi
-  record_cmd+=(--resume=true)
-fi
-
-if "$dry_run"; then
-  printf 'condition: %s\nprompt: %s\n\npose check:\n  ' "$condition" "$prompt"
-  printf '%q ' "$python_bin" "$script_dir/../common/check_start_pose.py" --profile relaxed
-  printf '\n\nrecord command:\n  '
-  printf '%q ' "${record_cmd[@]}"
-  printf '\n'
-  exit 0
-fi
-
-for required_path in \
-  "$python_bin" \
-  "$record_bin" \
-  "$model/adapter_config.json" \
-  "$model/adapter_model.safetensors" \
-  /dev/ttyACM0 \
-  /dev/video0; do
-  if [[ ! -e "$required_path" ]]; then
-    echo "Required path does not exist: $required_path" >&2
+# The cap used to count episodes in this condition's recorded dataset. Async
+# records nothing, so it counts logged results instead -- which is the better
+# source anyway: it caps what has actually been scored, not what was driven.
+#
+# Counted in awk, not python: the interpreter this project uses lives on the
+# robot host, and when it is absent the count fails. A guard that fails open is
+# worse than no guard -- it would have let an eleventh trial through in silence
+# and unbalanced the matrix. awk is always there, and a failure to read a file
+# that exists stops the trial below.
+logged=0
+if [[ -f "$trials_csv" ]]; then
+  if ! logged="$(awk -F, -v want="$condition" '
+      NR == 1 { for (i = 1; i <= NF; i++) if ($i == "condition") col = i; next }
+      col && $col == want { n++ }
+      END { print n + 0 }
+    ' "$trials_csv")"; then
+    echo "Could not read $trials_csv, so the 10-trial cap cannot be enforced." >&2
     exit 1
   fi
-done
+fi
 
-echo "Checking the follower start pose..."
-"$python_bin" "$script_dir/../common/check_start_pose.py" --profile relaxed
+if (( logged >= 10 )); then
+  echo "Condition $condition already has $logged/10 logged trials; refusing trial 11." >&2
+  echo "The 4x10 matrix is balanced by design -- an eleventh would unbalance it." >&2
+  exit 1
+fi
 
+echo "language condition : $condition  (trial $((logged + 1)) of 10)"
+echo "prompt             : $prompt"
 echo
-echo "Starting one SmolVLA language trial: $condition"
-echo "Prompt: $prompt"
-echo "Keep hands clear and be ready to stop the robot."
-"${record_cmd[@]}"
+
+episode_time_s="${EVAL_EPISODE_TIME_S:-40}"
+echo "horizon            : ${episode_time_s}s"
+echo
+
+cmd=(env "EVAL_TASK=$prompt" "EVAL_TRAIN_RUN=$train_run" "EVAL_CHECKPOINT=$checkpoint"
+  "EVAL_EPISODE_TIME_S=$episode_time_s"
+  bash "$script_dir/../common/run_policy_trial.sh")
+"$dry_run" && cmd+=(--dry-run)
+cmd+=(--async smolvla_language "eval_smolvla_$condition")
+
+"${cmd[@]}"
+status=$?
+
+if (( status == 0 )) && ! "$dry_run"; then
+  cat <<EOF
+
+Score this trial by what you saw, then log it. There is no episode to re-watch.
+Both questions are separate results:
+
+  did it build a stable stack at all?      -> manipulation
+  was it the colour order you asked for?   -> instruction following
+
+A tidy stack in the wrong order is a language failure, not a success:
+
+  python $script_dir/log_smolvla_language_trial.py --live-scored \\
+    --condition $condition --observed-behavior <yellow_on_red|red_on_yellow|none> \\
+    [--failure-label <label>] [--completion-time-s N]
+EOF
+fi
+exit $status

@@ -38,10 +38,15 @@
 #                          LeRobot's own default is 0.5.
 #   EVAL_SERVER_PORT       async policy server port (default 8080)
 #   EVAL_SKIP_WRIST_CHECK  set to 1 to skip the start-scene gate
+#   EVAL_TASK              instruction handed to the policy (default: stack
+#                          yellow on red). Only a VLA reads it; ACT ignores it.
+#                          The language experiment sets it per condition.
+#   EVAL_TRAIN_RUN         override the variant's training run directory
+#   EVAL_CHECKPOINT        checkpoint step, six digits (default 030000)
 
 set -uo pipefail
 
-usage() { sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { awk 'NR>1 && /^#/ {sub(/^# ?/,""); print; next} NR>1 {exit}' "$0"; }
 
 dry_run=false
 use_async=false
@@ -74,7 +79,11 @@ episode_time_s="${EVAL_EPISODE_TIME_S:-40}"
 chunk_threshold="${EVAL_CHUNK_THRESHOLD:-1.0}"
 server_port="${EVAL_SERVER_PORT:-8080}"
 
-TASK='Stack the yellow cube on top of the red cube'
+# The task string is what a VLA reads. It is fixed for every arm of the
+# ACT-vs-SmolVLA comparison, so it is a constant here -- but the language
+# experiment varies it deliberately, one prompt per condition, and that is the
+# whole point of that experiment. EVAL_TASK is how it does so.
+TASK="${EVAL_TASK:-Stack the yellow cube on top of the red cube}"
 CAMS_BOTH='{"front":{"type":"opencv","index_or_path":2,"width":640,"height":480,"fps":30,"fourcc":"MJPG"},"wrist":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"}}'
 CAMS_WRIST='{"wrist":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG"}}'
 
@@ -86,9 +95,10 @@ case "$variant" in
   combined)         policy_type=act;     train_run=act_stack_two_cubes_combined_40ep_b8_30k_seed1000;           cameras="$CAMS_BOTH";  required_video=(/dev/video0 /dev/video2) ;;
   smolvla_redleft)  policy_type=smolvla; train_run=smolvla_expert_redleft_20ep_b8_30k;                          cameras="$CAMS_BOTH";  required_video=(/dev/video0 /dev/video2) ;;
   smolvla_combined) policy_type=smolvla; train_run=smolvla_expert_combined_40ep_b8_30k;                         cameras="$CAMS_BOTH";  required_video=(/dev/video0 /dev/video2) ;;
+  smolvla_language) policy_type=smolvla; train_run=smolvla_expert_two_orders_60ep_b8_30k;                        cameras="$CAMS_BOTH";  required_video=(/dev/video0 /dev/video2) ;;
   *)
     echo "VARIANT must be one of: wristfront, wristonly, redleft, combined," >&2
-    echo "                        smolvla_redleft, smolvla_combined." >&2
+    echo "                        smolvla_redleft, smolvla_combined, smolvla_language." >&2
     exit 2 ;;
 esac
 
@@ -100,7 +110,12 @@ else
 fi
 : "${n_action_steps:=$chunk_actions}"
 
-model="$repo_root/outputs/train/$train_run/checkpoints/030000/pretrained_model"
+train_run="${EVAL_TRAIN_RUN:-$train_run}"
+checkpoint="${EVAL_CHECKPOINT:-030000}"
+if [[ ! "$checkpoint" =~ ^[0-9]{6}$ ]]; then
+  echo "EVAL_CHECKPOINT must be six digits, for example 030000." >&2; exit 2
+fi
+model="$repo_root/outputs/train/$train_run/checkpoints/$checkpoint/pretrained_model"
 dataset_root="${HF_LEROBOT_HOME:-$HOME/.cache/huggingface/lerobot}/GY-William/$run_id"
 latency_log="$repo_root/outputs/eval_latency/${run_id}.csv"
 
@@ -108,6 +123,7 @@ runway=$(awk "BEGIN{printf \"%.3f\", $n_action_steps / $fps}")
 echo "variant=$variant  policy=$policy_type  controller=$([[ $use_async == true ]] && echo async || echo sync)"
 echo "  model    : $model"
 echo "  fps=$fps  n_action_steps=$n_action_steps  horizon=${episode_time_s}s"
+echo "  task     : $TASK"
 echo "  a chunk of $n_action_steps actions at $fps fps lasts ${runway}s -- that is the budget a"
 echo "  refresh has to fit inside for the arm not to stall."
 if [[ "$use_async" == true ]]; then
@@ -142,7 +158,10 @@ if [[ "$use_async" == true ]]; then
   # The async stack is an optional dependency group, so a machine that trains and
   # evaluates fine can still be missing it. Say so here rather than letting the
   # server exit on an import and look like a crash.
-  if ! PYTHONNOUSERSITE=1 "$python_bin" -c 'import grpc' >/dev/null 2>&1; then
+  # --dry-run only prints the commands, so it must not require the runtime the
+  # commands would need. Checking here made the dry run unusable on any machine
+  # that is not the robot host -- which is exactly where you preview a command.
+  if ! "$dry_run" && ! PYTHONNOUSERSITE=1 "$python_bin" -c 'import grpc' >/dev/null 2>&1; then
     echo "The asynchronous controller needs grpcio, which is not installed." >&2
     echo "Install the wheel without disturbing anything else:" >&2
     echo "  $python_bin -m pip install --only-binary=:all: --no-deps grpcio==1.73.1" >&2
@@ -175,14 +194,21 @@ if [[ "$use_async" == true ]]; then
     "--chunk_size_threshold=$chunk_threshold"
     "--fps=$fps")
 
+  # An async trial writes no dataset, so these two logs are the only per-run
+  # artifact it leaves. Name them before the dry run exits, so a preview says
+  # where its output would land -- and so RUN_ID is visible at all, which under
+  # the synchronous controller it was via --dataset.repo_id.
+  server_log="$repo_root/outputs/eval_latency/${run_id}_server.log"
+  client_log="$repo_root/outputs/eval_latency/${run_id}_client.log"
+
   if "$dry_run"; then
     printf '%q ' "${server_cmd[@]}"; printf '\n\nthen:\n  '
     printf '%q ' "${client_cmd[@]}"; printf '\n'
+    printf '\nlogs:\n  %s\n  %s\n' "$server_log" "$client_log"
     exit 0
   fi
 
   mkdir -p "$repo_root/outputs/eval_latency"
-  server_log="$repo_root/outputs/eval_latency/${run_id}_server.log"
 
   port_open() {
     env PYTHONNOUSERSITE=1 "$python_bin" -c "
@@ -212,7 +238,6 @@ sys.exit(0 if s.connect_ex(('127.0.0.1',$server_port))==0 else 1)"
   # the robot and makes every trial a different length, which is not comparable
   # with the fixed-horizon ACT trials. Wait for the control loop to announce
   # itself, then start the clock.
-  client_log="$repo_root/outputs/eval_latency/${run_id}_client.log"
   "${client_cmd[@]}" > "$client_log" 2>&1 &
   client_pid=$!
   trap 'kill "$client_pid" 2>/dev/null; [[ -n "$server_pid" ]] && kill "$server_pid" 2>/dev/null' EXIT INT TERM
