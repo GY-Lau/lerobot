@@ -86,8 +86,9 @@ across — which never happened in eight synchronous trials. Its 15 ms inference
 lets the server emit a chunk almost every tick, each blended with the last, which
 is the frequent-replanning-plus-averaging condition that already made this policy
 stutter under temporal ensembling (finding #3). **The best controller depends on
-the ratio of inference time to chunk duration, and that ratio differs by 80x
-between the two families**, so controller and policy class cannot be
+the ratio of inference time to chunk duration, and that ratio differs by 167x
+between the two families** (0.753 against 0.0045; the inference times alone
+differ by 84x, which is a different number and not the one that matters here), so controller and policy class cannot be
 disentangled by picking one for both. An `n_action_steps=25` control also failed
 for SmolVLA, ruling out replanning frequency there and leaving continuity.
 
@@ -740,7 +741,9 @@ policy stuttered during the temporal-ensembling sweep in finding #3.
 
 So the two families want opposite controllers, for the same reason expressed
 twice: **the ratio of inference time to chunk duration differs between them by
-roughly 80x**. Choosing one controller for both does not remove the confound, it
+roughly 167x** -- 1.255 s against 1.67 s of chunk is 0.753, while 15 ms against
+3.33 s is 0.0045. The inference times on their own differ by only 84x; it is the
+ratio, not the latency, that decides which controller a policy wants. Choosing one controller for both does not remove the confound, it
 relocates it. Asynchronous inference is one of the SmolVLA paper's own
 contributions, so its asynchronous arm is the policy as designed; ACT's
 synchronous loop is already continuous and is its own best case. Each is
